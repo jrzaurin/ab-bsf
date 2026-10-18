@@ -11,7 +11,6 @@ from ab_bsf.bayesian.experiments import (
     NormalBayesianTest,
     PoissonBayesianTest,
 )
-from ab_bsf.bayesian.metrics import eval_bernoulli_agg
 
 
 def prob_b_beats_a(a1, b1, a2, b2):
@@ -71,11 +70,6 @@ def test_relative_difference_and_reference():
     r_b = t.evaluate(seed=0, reference="B")
     assert r_b[0]["relative_difference"] == pytest.approx(-0.09, abs=0.01)
     assert len(r[1]["posterior_samples"]) == 20000
-
-
-def test_eval_wrapper_signature():
-    pbbs, loss, ci = eval_bernoulli_agg([100, 100], [10, 20], seed=1)
-    assert len(pbbs) == len(loss) == len(ci) == 2 and sum(pbbs) == pytest.approx(1)
 
 
 # --------------------------------------------------------------------- normal

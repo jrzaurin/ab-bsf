@@ -8,12 +8,9 @@ Two layers:
 * ``estimate_*`` functions summarise any such array: probability of being best,
   expected loss, credible intervals, and (ab_bsf additions) relative differences
   vs a reference variant with their credible intervals.
-
-``eval_*_agg`` keep the bayesian-testing signature, returning
-``(pbbs, loss, intervals)``.
 """
 
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import numpy as np
 
@@ -39,21 +36,12 @@ __all__ = [
     "sample_poisson_agg",
     "sample_exponential_agg",
     "sample_numerical_dirichlet_agg",
-    "eval_bernoulli_agg",
-    "eval_normal_agg",
-    "eval_delta_lognormal_agg",
-    "eval_delta_normal_agg",
-    "eval_poisson_agg",
-    "eval_exponential_agg",
-    "eval_numerical_dirichlet_agg",
 ]
 
 _EPS = 1e-12
 
 
-# ---------------------------------------------------------------------------
 # Summaries of posterior draws
-# ---------------------------------------------------------------------------
 def estimate_probabilities(data: np.ndarray, min_is_best: bool = False) -> List[float]:
     """P(variant is best) for each row of ``data``."""
     data = np.asarray(data)
@@ -110,23 +98,11 @@ def estimate_relative_credible_intervals(
     return out
 
 
-def _summarise(
-    samples, min_is_best, interval_alpha
-) -> Tuple[List[float], List[float], List[List[float]]]:
-    return (
-        estimate_probabilities(samples, min_is_best),
-        estimate_expected_loss(samples, min_is_best),
-        estimate_credible_intervals(samples, interval_alpha),
-    )
-
-
 def _fill(values: Optional[List], default, n: int) -> List:
     return list(values) if values else [default] * n
 
 
-# ---------------------------------------------------------------------------
 # Posterior draws of the mean metric per variant
-# ---------------------------------------------------------------------------
 def sample_bernoulli_agg(
     totals,
     positives,
@@ -339,182 +315,3 @@ def sample_numerical_dirichlet_agg(
             for i in range(len(concentrations))
         ]
     )
-
-
-# ---------------------------------------------------------------------------
-# bayesian-testing style wrappers: (pbbs, loss, intervals)
-# ---------------------------------------------------------------------------
-def eval_bernoulli_agg(
-    totals,
-    positives,
-    a_priors_beta=None,
-    b_priors_beta=None,
-    sim_count=20000,
-    seed=None,
-    min_is_best=False,
-    interval_alpha=0.95,
-):
-    if len(totals) == 0:
-        return [], [], []
-    s = sample_bernoulli_agg(
-        totals, positives, a_priors_beta, b_priors_beta, sim_count, seed
-    )
-    return _summarise(s, min_is_best, interval_alpha)
-
-
-def eval_normal_agg(
-    totals,
-    sums,
-    sums_2,
-    sim_count=20000,
-    m_priors=None,
-    a_priors_ig=None,
-    b_priors_ig=None,
-    w_priors=None,
-    seed=None,
-    min_is_best=False,
-    interval_alpha=0.95,
-):
-    if len(totals) == 0:
-        return [], [], []
-    s = sample_normal_agg(
-        totals,
-        sums,
-        sums_2,
-        m_priors,
-        a_priors_ig,
-        b_priors_ig,
-        w_priors,
-        sim_count,
-        seed,
-    )
-    return _summarise(s, min_is_best, interval_alpha)
-
-
-def eval_delta_lognormal_agg(
-    totals,
-    non_zeros,
-    sum_logs,
-    sum_logs_2,
-    sim_count=20000,
-    a_priors_beta=None,
-    b_priors_beta=None,
-    m_priors=None,
-    a_priors_ig=None,
-    b_priors_ig=None,
-    w_priors=None,
-    seed=None,
-    min_is_best=False,
-    interval_alpha=0.95,
-):
-    if len(totals) == 0:
-        return [], [], []
-    if max(non_zeros) <= 0:
-        n = len(totals)
-        return [round(1 / n, 7)] * n, [np.nan] * n, [[np.nan, np.nan]] * n
-    s = sample_delta_lognormal_agg(
-        totals,
-        non_zeros,
-        sum_logs,
-        sum_logs_2,
-        a_priors_beta,
-        b_priors_beta,
-        m_priors,
-        a_priors_ig,
-        b_priors_ig,
-        w_priors,
-        sim_count,
-        seed,
-    )
-    return _summarise(s, min_is_best, interval_alpha)
-
-
-def eval_delta_normal_agg(
-    totals,
-    non_zeros,
-    sums,
-    sums_2,
-    sim_count=20000,
-    a_priors_beta=None,
-    b_priors_beta=None,
-    m_priors=None,
-    a_priors_ig=None,
-    b_priors_ig=None,
-    w_priors=None,
-    seed=None,
-    min_is_best=False,
-    interval_alpha=0.95,
-):
-    if len(totals) == 0:
-        return [], [], []
-    if max(non_zeros) <= 0:
-        n = len(totals)
-        return [round(1 / n, 7)] * n, [np.nan] * n, [[np.nan, np.nan]] * n
-    s = sample_delta_normal_agg(
-        totals,
-        non_zeros,
-        sums,
-        sums_2,
-        a_priors_beta,
-        b_priors_beta,
-        m_priors,
-        a_priors_ig,
-        b_priors_ig,
-        w_priors,
-        sim_count,
-        seed,
-    )
-    return _summarise(s, min_is_best, interval_alpha)
-
-
-def eval_poisson_agg(
-    totals,
-    sums,
-    a_priors_gamma=None,
-    b_priors_gamma=None,
-    sim_count=20000,
-    seed=None,
-    min_is_best=False,
-    interval_alpha=0.95,
-):
-    if len(totals) == 0:
-        return [], [], []
-    s = sample_poisson_agg(
-        totals, sums, a_priors_gamma, b_priors_gamma, sim_count, seed
-    )
-    return _summarise(s, min_is_best, interval_alpha)
-
-
-def eval_exponential_agg(
-    totals,
-    sums,
-    a_priors_gamma=None,
-    b_priors_gamma=None,
-    sim_count=20000,
-    seed=None,
-    min_is_best=False,
-    interval_alpha=0.95,
-):
-    if len(totals) == 0:
-        return [], [], []
-    s = sample_exponential_agg(
-        totals, sums, a_priors_gamma, b_priors_gamma, sim_count, seed
-    )
-    return _summarise(s, min_is_best, interval_alpha)
-
-
-def eval_numerical_dirichlet_agg(
-    states,
-    concentrations,
-    prior_alphas=None,
-    sim_count=20000,
-    seed=None,
-    min_is_best=False,
-    interval_alpha=0.95,
-):
-    if len(concentrations) == 0:
-        return [], [], []
-    s = sample_numerical_dirichlet_agg(
-        states, concentrations, prior_alphas, sim_count, seed
-    )
-    return _summarise(s, min_is_best, interval_alpha)
