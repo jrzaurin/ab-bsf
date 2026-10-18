@@ -15,8 +15,6 @@ class PoissonBayesianTest(BaseBayesianTest):
     posterior too narrow; check var/mean before trusting the intervals.
     """
 
-    _aggregate_keys = ("totals", "sum_values")
-
     @property
     def totals(self):
         return self._values("totals")
@@ -34,30 +32,55 @@ class PoissonBayesianTest(BaseBayesianTest):
         return self._values("b_prior")
 
     def _posterior_samples(self, sim_count, seed):
-        return sample_poisson_agg(self.totals, self.sum_values, self.a_priors, self.b_priors, sim_count, seed)
+        return sample_poisson_agg(
+            self.totals, self.sum_values, self.a_priors, self.b_priors, sim_count, seed
+        )
 
     def _observed_columns(self) -> Dict[str, List[Any]]:
         return {
             "totals": self.totals,
             "sum_values": [round(s, 5) for s in self.sum_values],
-            "observed_average": [round(s / t, 5) for s, t in zip(self.sum_values, self.totals)],
+            "observed_average": [
+                round(s / t, 5) for s, t in zip(self.sum_values, self.totals)
+            ],
         }
 
     def _posterior_means(self, samples):
-        return [round((a + s) / (b + t), 5) for s, t, a, b in zip(self.sum_values, self.totals, self.a_priors, self.b_priors)]
+        return [
+            round((a + s) / (b + t), 5)
+            for s, t, a, b in zip(
+                self.sum_values, self.totals, self.a_priors, self.b_priors
+            )
+        ]
 
     def add_variant_data_agg(
-        self, name: str, totals: int, sum_values: float, a_prior: float = 0.1, b_prior: float = 0.1, replace: bool = True
+        self,
+        name: str,
+        totals: int,
+        sum_values: float,
+        a_prior: float = 0.1,
+        b_prior: float = 0.1,
+        replace: bool = True,
     ) -> None:
         """Add aggregated counts. Default prior Gamma(0.1, 0.1)."""
         if a_prior <= 0 or b_prior <= 0:
             raise ValueError("Both [a_prior, b_prior] have to be positive numbers.")
         if totals <= 0 or sum_values < 0:
             raise ValueError("Need totals > 0 and sum_values >= 0.")
-        self._store(name, {"totals": totals, "sum_values": sum_values}, {"a_prior": a_prior, "b_prior": b_prior}, replace)
+        self._store(
+            name,
+            {"totals": totals, "sum_values": sum_values},
+            {"a_prior": a_prior, "b_prior": b_prior},
+            replace,
+        )
 
     def add_variant_data(
-        self, name: str, data: List[int], a_prior: float = 0.1, b_prior: float = 0.1, replace: bool = True
+        self,
+        name: str,
+        data: List[int],
+        a_prior: float = 0.1,
+        b_prior: float = 0.1,
+        replace: bool = True,
     ) -> None:
         """Add raw non-negative integer counts."""
         x = np.asarray(data)
@@ -65,4 +88,6 @@ class PoissonBayesianTest(BaseBayesianTest):
             raise ValueError("Data of added variant needs to have some observations.")
         if (x < 0).any() or not np.all(np.mod(x, 1) == 0):
             raise ValueError("Input data needs to be non-negative integers.")
-        self.add_variant_data_agg(name, int(x.size), float(x.sum()), a_prior, b_prior, replace)
+        self.add_variant_data_agg(
+            name, int(x.size), float(x.sum()), a_prior, b_prior, replace
+        )

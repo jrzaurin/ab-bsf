@@ -38,7 +38,15 @@ def make_conversion_data(
         shock = 0.25 * np.sin(2 * np.pi * d / 7) + rng.normal(0, day_sd)
         for g, lift in groups.items():
             p = 1 / (1 + np.exp(-(base + shock + np.log1p(lift))))
-            frames.append(pd.DataFrame({"day": d, "group": g, "conversion": rng.binomial(1, p, users_per_day)}))
+            frames.append(
+                pd.DataFrame(
+                    {
+                        "day": d,
+                        "group": g,
+                        "conversion": rng.binomial(1, p, users_per_day),
+                    }
+                )
+            )
     return pd.concat(frames, ignore_index=True)
 
 
@@ -58,9 +66,14 @@ def make_revenue_data(
     """
     rng = np.random.default_rng(seed)
     out = []
-    for g, cl, ml in [("control", 0.0, 0.0), ("treatment", conversion_lift, magnitude_lift)]:
+    for g, cl, ml in [
+        ("control", 0.0, 0.0),
+        ("treatment", conversion_lift, magnitude_lift),
+    ]:
         conv = rng.random(n_per_group) < conversion_rate * (1 + cl)
-        rev = np.where(conv, rng.lognormal(log_mean + np.log1p(ml), log_sd, n_per_group), 0.0)
+        rev = np.where(
+            conv, rng.lognormal(log_mean + np.log1p(ml), log_sd, n_per_group), 0.0
+        )
         out.append(pd.DataFrame({"group": g, "revenue": rev}))
     return pd.concat(out, ignore_index=True)
 

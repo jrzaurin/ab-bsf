@@ -14,8 +14,6 @@ class DeltaLognormalBayesianTest(BaseBayesianTest):
     The compared metric is the mean per observation, P(non-zero) x E[value | non-zero].
     """
 
-    _aggregate_keys = ("totals", "positives", "sum_values", "sum_logs", "sum_logs_2")
-
     @property
     def totals(self):
         return self._values("totals")
@@ -58,8 +56,13 @@ class DeltaLognormalBayesianTest(BaseBayesianTest):
             "totals": self.totals,
             "positives": self.positives,
             "sum_values": [round(s, 5) for s in self.sum_values],
-            "avg_values": [round(s / t, 5) for s, t in zip(self.sum_values, self.totals)],
-            "avg_positive_values": [round(s / p, 5) if p else 0.0 for s, p in zip(self.sum_values, self.positives)],
+            "avg_values": [
+                round(s / t, 5) for s, t in zip(self.sum_values, self.totals)
+            ],
+            "avg_positive_values": [
+                round(s / p, 5) if p else 0.0
+                for s, p in zip(self.sum_values, self.positives)
+            ],
         }
 
     def add_variant_data_agg(
@@ -92,13 +95,21 @@ class DeltaLognormalBayesianTest(BaseBayesianTest):
         a_prior_ig, b_prior_ig, w_prior : NIG prior on the log values.
         """
         if a_prior_beta <= 0 or b_prior_beta <= 0:
-            raise ValueError("Both [a_prior_beta, b_prior_beta] have to be positive numbers.")
+            raise ValueError(
+                "Both [a_prior_beta, b_prior_beta] have to be positive numbers."
+            )
         if a_prior_ig < 0 or b_prior_ig < 0 or w_prior < 0:
-            raise ValueError("All priors of [a_ig, b_ig, w] have to be non-negative numbers.")
+            raise ValueError(
+                "All priors of [a_ig, b_ig, w] have to be non-negative numbers."
+            )
         if totals <= 0:
-            raise ValueError("Input variable 'totals' is expected to be positive integer.")
+            raise ValueError(
+                "Input variable 'totals' is expected to be positive integer."
+            )
         if positives < 0:
-            raise ValueError("Input variable 'positives' is expected to be a non-negative integer.")
+            raise ValueError(
+                "Input variable 'positives' is expected to be a non-negative integer."
+            )
         if totals < positives:
             raise ValueError("Not possible to have more positives that totals!")
         self._store(

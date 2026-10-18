@@ -76,7 +76,9 @@ def mixed_effects_linear_regression(
     samples gives reliable effects on the percentage-point scale.
     """
     ref = _reference(df, group_col, reference_group)
-    model = smf.mixedlm(f"{metric_col} ~ {_group_term(group_col, ref)}", df, groups=df[temporal_col])
+    model = smf.mixedlm(
+        f"{metric_col} ~ {_group_term(group_col, ref)}", df, groups=df[temporal_col]
+    )
     return model.fit(reml=True)
 
 
@@ -95,7 +97,11 @@ def fixed_effects_logistic_regression(
     Coefficients are log odds ratios.
     """
     ref = _reference(df, group_col, reference_group)
-    agg = df.groupby([temporal_col, group_col], observed=True)[metric_col].agg(_succ="sum", _n="count").reset_index()
+    agg = (
+        df.groupby([temporal_col, group_col], observed=True)[metric_col]
+        .agg(_succ="sum", _n="count")
+        .reset_index()
+    )
     agg["_fail"] = agg["_n"] - agg["_succ"]
     formula = f"_succ + _fail ~ {_group_term(group_col, ref)} + C({temporal_col})"
     model = smf.glm(formula, agg, family=sm.families.Binomial())
@@ -124,7 +130,9 @@ def mixed_effects_logistic_regression(
 
     ref = _reference(df, group_col, reference_group)
     model = BinomialBayesMixedGLM.from_formula(
-        f"{metric_col} ~ {_group_term(group_col, ref)}", {"time": f"0 + C({temporal_col})"}, df
+        f"{metric_col} ~ {_group_term(group_col, ref)}",
+        {"time": f"0 + C({temporal_col})"},
+        df,
     )
     result = model.fit_vb()
     result._pump_exog_names = model.exog_names  # used by summarise_treatment_effects

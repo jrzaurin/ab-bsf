@@ -9,7 +9,7 @@ ab_bsf/
 ├── bayesian/
 │   ├── experiments/   BinaryBayesianTest, NormalBayesianTest, DeltaLognormalBayesianTest,
 │   │                  DeltaNormalBayesianTest, ExponentialBayesianTest, PoissonBayesianTest,
-│   │                  DiscreteBayesianTest, BinaryDidTest (+ BaseBayesianTest, BaseDidTest)
+│   │                  DiscreteBayesianTest (+ BaseBayesianTest)
 │   └── metrics/       posteriors.py (conjugate samplers), evaluation.py (P(best), loss, CIs, relative diffs)
 ├── frequentist/
 │   ├── experiments/   design: BinaryFrequentistTest, ContinuousFrequentistTest,
@@ -21,7 +21,7 @@ ab_bsf/
 
 ```bash
 pip install -e ".[dev]"
-pytest            # 98 tests incl. doctests
+pytest            # 95 tests incl. doctests
 ```
 
 ## Quick tour
@@ -33,7 +33,6 @@ t.add_variant_data_agg("control", totals=1000, positives=110)
 t.add_variant_data_agg("treatment", totals=1000, positives=150)
 t.evaluate(seed=1)          # posterior_mean, credible_interval, relative_difference,
                             # relative_credible_interval, prob_being_best, expected_loss, posterior_samples
-t.evaluate_with_did(pre_rates={"control": 0.10, "treatment": 0.12})
 
 from ab_bsf.frequentist.experiments import BinaryFrequentistTest
 d = BinaryFrequentistTest(n1=1000, p1=0.05)          # one-tailed, pooled variance by default
@@ -58,7 +57,7 @@ The original files themselves were not available, so:
 | Part | Source |
 |---|---|
 | `bayesian/metrics/posteriors.py`, the Beta/NIG/Gamma/Dirichlet maths | bayesian-testing (MIT, © Matus Baniar), which ab_bsf mirrored |
-| Bayesian class names, `relative_difference` / `relative_credible_interval` / `posterior_samples` outputs, `add_variant_data_did` (Normal), `evaluate_with_did` (Binary), `BinaryDidTest` | recovered from chats |
+| Bayesian class names, `relative_difference` / `relative_credible_interval` / `posterior_samples` outputs | recovered from chats |
 | `ContinuousFrequentistTest`, `DeltaLognormalFrequentistTest`, `alias_params` usage, `n_variants`/`alpha_`, `test_duration` | recovered from chats |
 | `BaseFrequentistTest`, `BinaryFrequentistTest` internals, `alias_params` body | reconstructed from how they were called |
 | `t_test`, `t_test_did`, `t_test_did_log`, `t_test_did_regr`, `t_test_delta_lognormal`, `winsorize`, `cuped_adjustment`, fixed/mixed regressions | recovered signatures and behaviour; bodies rewritten |
@@ -86,9 +85,5 @@ Statistics:
 
 Left out on purpose:
 
-* **DiD for Exponential / Delta-Lognormal via `|post - pre|` or positive-only changes**: those transforms
-  drop the sign of the change or misclassify decreases, so the "DiD" they report is not a DiD.
-  For per-user pre/post data use `NormalBayesianTest.add_variant_data_did` or `t_test_did(_log)`.
-* **"Binary DiD" via `post == 1`**: that is just the post-period rate. Use `evaluate_with_did`
-  (known pre rates) or `BinaryDidTest` (pre-period counts).
+* **Bayesian DiD**: removed for now. For per-user pre/post data use `t_test_did(_log)`.
 * PyMC (MCMC) exponential test, linearmodels two-way panel FE: optional heavy dependencies, not rebuilt.

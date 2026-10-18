@@ -23,8 +23,16 @@ ALT = {"one_tail": "larger", "two_tail": "two-sided"}
 @pytest.mark.parametrize("tt", ["one_tail", "two_tail"])
 @pytest.mark.parametrize("ratio", [1.0, 2.0])
 def test_arcsine_sample_size_matches_statsmodels(p1, p2, tt, ratio):
-    n1, n2 = calculate_sample_size_given_power(p1, p2, test_type=tt, ratio=ratio, use_pooled_variance=False)
-    sm = NormalIndPower().solve_power(proportion_effectsize(p2, p1), alpha=0.05, power=0.8, ratio=ratio, alternative=ALT[tt])
+    n1, n2 = calculate_sample_size_given_power(
+        p1, p2, test_type=tt, ratio=ratio, use_pooled_variance=False
+    )
+    sm = NormalIndPower().solve_power(
+        proportion_effectsize(p2, p1),
+        alpha=0.05,
+        power=0.8,
+        ratio=ratio,
+        alternative=ALT[tt],
+    )
     assert 0 <= n1 - sm < 2  # ceil, plus opposite tail in two-sided
     assert n2 == int(np.ceil(n1 * ratio))
 
@@ -33,17 +41,25 @@ def test_arcsine_sample_size_matches_statsmodels(p1, p2, tt, ratio):
 @pytest.mark.parametrize("tt", ["one_tail", "two_tail"])
 @pytest.mark.parametrize("pooled", [True, False])
 def test_round_trips(p1, p2, tt, pooled):
-    n1, n2 = calculate_sample_size_given_power(p1, p2, test_type=tt, use_pooled_variance=pooled)
-    pw = calculate_power_given_sample_size(n1, p1, p2, n2=n2, test_type=tt, use_pooled_variance=pooled)
+    n1, n2 = calculate_sample_size_given_power(
+        p1, p2, test_type=tt, use_pooled_variance=pooled
+    )
+    pw = calculate_power_given_sample_size(
+        n1, p1, p2, n2=n2, test_type=tt, use_pooled_variance=pooled
+    )
     assert 0.8 <= pw < 0.802
-    _, p2_min = minimum_detectable_effect(n1, p1, n2=n2, test_type=tt, use_pooled_variance=pooled)
+    _, p2_min = minimum_detectable_effect(
+        n1, p1, n2=n2, test_type=tt, use_pooled_variance=pooled
+    )
     assert abs(p2_min - p2) / (p2 - p1) < 0.01  # within 1% of the effect
 
 
 def test_observed_var_matches_pooled_when_equal():
     p1, p2 = 0.1, 0.12
     var = (p1 * (1 - p1) + p2 * (1 - p2)) / 2
-    assert calculate_sample_size_given_power(p1, p2, p1_observed_var=var) == calculate_sample_size_given_power(p1, p2)
+    assert calculate_sample_size_given_power(
+        p1, p2, p1_observed_var=var
+    ) == calculate_sample_size_given_power(p1, p2)
 
 
 @pytest.mark.parametrize("tt", ["one_tail", "two_tail"])
@@ -62,7 +78,9 @@ def test_power_matches_simulation(tt):
 
 def test_duration_consistency():
     r = estimate_test_duration_from_mde(5_000, 0.10, 0.20, traffic_split=0.5)
-    assert np.isclose(r["duration_days"], estimate_test_duration(5_000, r["sample_size_control"], 0.5))
+    assert np.isclose(
+        r["duration_days"], estimate_test_duration(5_000, r["sample_size_control"], 0.5)
+    )
     # whole-day search agrees with the continuous duration
     d = find_days_for_target_power(5_000, 0.10, 0.12, traffic_split=0.5)
     assert d == int(np.ceil(r["duration_days"])) or abs(d - r["duration_days"]) <= 1

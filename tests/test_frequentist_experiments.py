@@ -21,13 +21,23 @@ ALT = {"one_tail": "larger", "two_tail": "two-sided"}
 @pytest.mark.parametrize("tt", ["one_tail", "two_tail"])
 @pytest.mark.parametrize("ratio", [1.0, 2.0])
 def test_binary_arcsine_matches_statsmodels(p1, p2, tt, ratio):
-    t = BinaryFrequentistTest(n1=1000, p1=p1, test_type=tt, ratio=ratio, use_pooled_variance=False)
+    t = BinaryFrequentistTest(
+        n1=1000, p1=p1, test_type=tt, ratio=ratio, use_pooled_variance=False
+    )
     n1, n2 = t.sample_size_given_power(p2)
-    sm = NormalIndPower().solve_power(proportion_effectsize(p2, p1), alpha=0.05, power=0.8, ratio=ratio, alternative=ALT[tt])
+    sm = NormalIndPower().solve_power(
+        proportion_effectsize(p2, p1),
+        alpha=0.05,
+        power=0.8,
+        ratio=ratio,
+        alternative=ALT[tt],
+    )
     assert 0 <= n1 - sm < 2
 
 
-@pytest.mark.parametrize("opts", [{}, {"use_pooled_variance": False}, {"p1_observed_var": 0.1 * 0.9}])
+@pytest.mark.parametrize(
+    "opts", [{}, {"use_pooled_variance": False}, {"p1_observed_var": 0.1 * 0.9}]
+)
 @pytest.mark.parametrize("tt", ["one_tail", "two_tail"])
 def test_binary_round_trips(opts, tt):
     t = BinaryFrequentistTest(n1=1000, p1=0.1, test_type=tt, **opts)
@@ -76,15 +86,21 @@ def test_mde_given_duration_uses_fixed_power():
     t = BinaryFrequentistTest(n1=1000, p1=0.1)
     out = t.mde_given_duration(daily_observations=500, days=14)
     n = out["control_sample_size"]
-    assert t.power_given_sample_size(out["target_mean"], n) == pytest.approx(0.8, abs=1e-6)
+    assert t.power_given_sample_size(out["target_mean"], n) == pytest.approx(
+        0.8, abs=1e-6
+    )
 
 
 # ----------------------------------------------------------------- continuous
 @pytest.mark.parametrize("ratio", [1.0, 0.5, 3.0])
 def test_continuous_matches_statsmodels_normal(ratio):
-    t = ContinuousFrequentistTest(n1=100, mean1=100, std1=20, ratio=ratio, test_type="two_tail")
+    t = ContinuousFrequentistTest(
+        n1=100, mean1=100, std1=20, ratio=ratio, test_type="two_tail"
+    )
     n1, _ = t.sample_size_given_power(105)
-    sm = NormalIndPower().solve_power(5 / 20, alpha=0.05, power=0.8, ratio=ratio, alternative="two-sided")
+    sm = NormalIndPower().solve_power(
+        5 / 20, alpha=0.05, power=0.8, ratio=ratio, alternative="two-sided"
+    )
     assert 0 <= n1 - sm < 2
     assert t.power_given_sample_size(105, n1) >= 0.8
 
@@ -110,15 +126,24 @@ def test_alias_params():
 # ------------------------------------------------------------ delta-lognormal
 def test_delta_lognormal_validation():
     with pytest.raises(ValueError):
-        DeltaLognormalFrequentistTest(n1=1000, p1=20, conversion_rate=0.3, mean_positive=35, std_log=0.5)
-    t = DeltaLognormalFrequentistTest(n1=1000, p1=10.5, conversion_rate=0.3, mean_positive=35, std_positive=18.6)
+        DeltaLognormalFrequentistTest(
+            n1=1000, p1=20, conversion_rate=0.3, mean_positive=35, std_log=0.5
+        )
+    t = DeltaLognormalFrequentistTest(
+        n1=1000, p1=10.5, conversion_rate=0.3, mean_positive=35, std_positive=18.6
+    )
     assert t.std_log == pytest.approx(0.5, abs=0.01)
 
 
 def test_delta_lognormal_sample_size_achieves_power_by_simulation():
     cr, sigma, mu = 0.3, 0.5, np.log(35) - 0.125
     t = DeltaLognormalFrequentistTest(
-        n1=1000, p1=0.3 * 35, conversion_rate=cr, mean_positive=35, std_log=sigma, test_type="two_tail"
+        n1=1000,
+        p1=0.3 * 35,
+        conversion_rate=cr,
+        mean_positive=35,
+        std_log=sigma,
+        test_type="two_tail",
     )
     target = t.p1 * 1.10
     n, _ = t.sample_size_given_power(target)
@@ -130,8 +155,12 @@ def test_delta_lognormal_sample_size_achieves_power_by_simulation():
     reps = 300
     for _ in range(reps):
         c = np.where(rng.random(n) < cr, rng.lognormal(mu, sigma, n), 0)
-        tr = np.where(rng.random(n) < conv2, rng.lognormal(mu + np.log(mag2 / 35), sigma, n), 0)
-        df = pd.DataFrame({"group": ["control"] * n + ["treatment"] * n, "revenue": np.r_[c, tr]})
+        tr = np.where(
+            rng.random(n) < conv2, rng.lognormal(mu + np.log(mag2 / 35), sigma, n), 0
+        )
+        df = pd.DataFrame(
+            {"group": ["control"] * n + ["treatment"] * n, "revenue": np.r_[c, tr]}
+        )
         r = t_test_delta_lognormal(df, "revenue")["treatment_vs_control"]
         hits += r["which_significant"] != "neither"
     # both parts sized for 80% -> P(at least one) should be ~ 1 - 0.2^2 = 0.96

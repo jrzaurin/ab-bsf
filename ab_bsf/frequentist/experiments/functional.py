@@ -46,7 +46,12 @@ Distribution = Literal["normal", "t"]
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _z_alpha(alpha: float, test_type: TestType, distribution: Distribution = "normal", dof: Optional[int] = None) -> float:
+def _z_alpha(
+    alpha: float,
+    test_type: TestType,
+    distribution: Distribution = "normal",
+    dof: Optional[int] = None,
+) -> float:
     q = 1 - alpha / 2 if test_type == "two_tail" else 1 - alpha
     if distribution == "t":
         if dof is None:
@@ -125,7 +130,11 @@ def calculate_sample_size_given_power(
     z = _z_alpha(alpha, test_type) + norm.ppf(power)
 
     if p1_observed_var is not None or use_pooled_variance:
-        var = p1_observed_var if p1_observed_var is not None else (p1 * (1 - p1) + p2 * (1 - p2)) / 2
+        var = (
+            p1_observed_var
+            if p1_observed_var is not None
+            else (p1 * (1 - p1) + p2 * (1 - p2)) / 2
+        )
         n1 = z**2 * var * (1 + 1 / ratio) / (p2 - p1) ** 2
     else:
         n1 = z**2 * (1 + 1 / ratio) / _cohens_h(p1, p2) ** 2
@@ -166,7 +175,11 @@ def calculate_power_given_sample_size(
     z_a = _z_alpha(alpha, test_type, distribution, n1 + n2 - 2)
 
     if p1_observed_var is not None or use_pooled_variance:
-        var = p1_observed_var if p1_observed_var is not None else (p1 * (1 - p1) + p2 * (1 - p2)) / 2
+        var = (
+            p1_observed_var
+            if p1_observed_var is not None
+            else (p1 * (1 - p1) + p2 * (1 - p2)) / 2
+        )
         z_stat = abs(p2 - p1) / np.sqrt(var * (1 / n1 + 1 / n2))
     else:
         z_stat = abs(_cohens_h(p1, p2)) / np.sqrt(1 / n1 + 1 / n2)
@@ -340,9 +353,17 @@ def power_duration_tradeoff_analysis(
     if n <= 0:
         raise ValueError("Duration constraint results in zero sample size")
 
-    kw = dict(test_type=test_type, p1_observed_var=p1_observed_var, use_pooled_variance=use_pooled_variance)
-    achievable_power = calculate_power_given_sample_size(n, baseline_conv, target_conv, alpha, n, **kw)
-    mde, min_conv = minimum_detectable_effect(n, baseline_conv, alpha, mde_power, n, **kw)
+    kw = dict(
+        test_type=test_type,
+        p1_observed_var=p1_observed_var,
+        use_pooled_variance=use_pooled_variance,
+    )
+    achievable_power = calculate_power_given_sample_size(
+        n, baseline_conv, target_conv, alpha, n, **kw
+    )
+    mde, min_conv = minimum_detectable_effect(
+        n, baseline_conv, alpha, mde_power, n, **kw
+    )
     target_effect = (target_conv - baseline_conv) / baseline_conv
 
     return {
@@ -355,7 +376,11 @@ def power_duration_tradeoff_analysis(
         "mde_power": mde_power,
         "min_detectable_conv": min_conv,
         "target_detectable": target_effect >= mde,
-        "recommendation": ("sufficient_power" if achievable_power >= mde_power else "insufficient_power"),
+        "recommendation": (
+            "sufficient_power"
+            if achievable_power >= mde_power
+            else "insufficient_power"
+        ),
     }
 
 
@@ -384,7 +409,14 @@ def calculate_power_over_time(
         n = int(per_group_per_day * d)
         powers.append(
             calculate_power_given_sample_size(
-                n, baseline_conv, target_conv, alpha, n, test_type, p1_observed_var, use_pooled_variance
+                n,
+                baseline_conv,
+                target_conv,
+                alpha,
+                n,
+                test_type,
+                p1_observed_var,
+                use_pooled_variance,
             )
             if n > 0
             else 0.0

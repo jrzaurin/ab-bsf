@@ -8,7 +8,9 @@ from typing import Dict, Tuple
 import numpy as np
 
 
-def design_effect(cluster_size: float, icc: float, cluster_size_cv: float = 0.0) -> float:
+def design_effect(
+    cluster_size: float, icc: float, cluster_size_cv: float = 0.0
+) -> float:
     """
     Variance inflation from clustering.
 

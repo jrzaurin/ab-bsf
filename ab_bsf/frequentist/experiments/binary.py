@@ -3,7 +3,11 @@ from typing import Optional, Tuple
 import numpy as np
 from scipy.stats import norm
 
-from ab_bsf.frequentist.experiments.base import BaseFrequentistTest, Distribution, TestType
+from ab_bsf.frequentist.experiments.base import (
+    BaseFrequentistTest,
+    Distribution,
+    TestType,
+)
 from ab_bsf.utils.utils import alias_params
 
 
@@ -28,7 +32,10 @@ class BinaryFrequentistTest(BaseFrequentistTest):
     (341, 341)
     """
 
-    @alias_params(p1=["conversion_rate", "baseline_conversion"], n1=["n_control", "initial_control_sample_size"])
+    @alias_params(
+        p1=["conversion_rate", "baseline_conversion"],
+        n1=["n_control", "initial_control_sample_size"],
+    )
     def __init__(
         self,
         n1: int,
@@ -43,9 +50,13 @@ class BinaryFrequentistTest(BaseFrequentistTest):
     ):
         if not 0 < p1 < 1:
             raise ValueError("p1 must be a conversion rate strictly between 0 and 1")
-        super().__init__(n1, p1, alpha, power, n2, ratio, distribution, test_type, **kwargs)
+        super().__init__(
+            n1, p1, alpha, power, n2, ratio, distribution, test_type, **kwargs
+        )
         self.p1_observed_var = self.additional_params.get("p1_observed_var")
-        self.use_pooled_variance = self.additional_params.get("use_pooled_variance", True)
+        self.use_pooled_variance = self.additional_params.get(
+            "use_pooled_variance", True
+        )
 
     # --------------------------------------------------------------- helpers
     def _var(self, p2: float) -> Optional[float]:
@@ -82,8 +93,13 @@ class BinaryFrequentistTest(BaseFrequentistTest):
         n_control = int(np.ceil(n_control))
         return n_control, int(np.ceil(n_control * self.ratio))
 
-    @alias_params(p2=["target_conversion", "conversion_rate_2"], control_sample_size="total_control_sample_size")
-    def power_given_sample_size(self, p2: float, control_sample_size: Optional[int] = None) -> float:
+    @alias_params(
+        p2=["target_conversion", "conversion_rate_2"],
+        control_sample_size="total_control_sample_size",
+    )
+    def power_given_sample_size(
+        self, p2: float, control_sample_size: Optional[int] = None
+    ) -> float:
         """Power to detect ``p1 -> p2`` with the stored or given control size."""
         n_c, n_t = self._overwrite_sample_size(control_sample_size)
         z_a = self._z_alpha(n_c, n_t)
@@ -95,7 +111,9 @@ class BinaryFrequentistTest(BaseFrequentistTest):
         return self._power_from_z(z_stat, z_a)
 
     @alias_params(control_sample_size="total_control_sample_size")
-    def minimum_detectable_effect(self, control_sample_size: Optional[int] = None) -> Tuple[float, float]:
+    def minimum_detectable_effect(
+        self, control_sample_size: Optional[int] = None
+    ) -> Tuple[float, float]:
         """
         Smallest upward lift detectable with ``power``: returns (relative MDE, p2_min).
         Pooled variance depends on p2, so it is solved by fixed-point iteration.

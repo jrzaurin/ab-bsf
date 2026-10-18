@@ -37,7 +37,11 @@ def beta_posteriors_all(
     rng = np.random.default_rng(seed)
     return np.array(
         [
-            rng.beta(positives[i] + a_priors_beta[i], totals[i] - positives[i] + b_priors_beta[i], sim_count)
+            rng.beta(
+                positives[i] + a_priors_beta[i],
+                totals[i] - positives[i] + b_priors_beta[i],
+                sim_count,
+            )
             for i in range(len(totals))
         ]
     )
@@ -101,7 +105,9 @@ def lognormal_posteriors(
     """
     if total <= 0:
         return np.zeros(sim_count)
-    mu, sig_2 = normal_posteriors(total, sum_logs, sum_logs_2, sim_count, prior_m, prior_a, prior_b, prior_w, seed)
+    mu, sig_2 = normal_posteriors(
+        total, sum_logs, sum_logs_2, sim_count, prior_m, prior_a, prior_b, prior_w, seed
+    )
     return np.exp(mu + sig_2 / 2)
 
 
@@ -127,7 +133,14 @@ def pois_gamma_posteriors_all(
     """Gamma(a + sum, rate=b + n) draws of the Poisson rate for every variant."""
     rng = np.random.default_rng(seed)
     return np.array(
-        [rng.gamma(sums[i] + a_priors_gamma[i], 1 / (totals[i] + b_priors_gamma[i]), sim_count) for i in range(len(totals))]
+        [
+            rng.gamma(
+                sums[i] + a_priors_gamma[i],
+                1 / (totals[i] + b_priors_gamma[i]),
+                sim_count,
+            )
+            for i in range(len(totals))
+        ]
     )
 
 
@@ -142,5 +155,12 @@ def exp_gamma_posteriors_all(
     """Gamma(a + n, rate=b + sum) draws of the Exponential *rate* for every variant."""
     rng = np.random.default_rng(seed)
     return np.array(
-        [rng.gamma(totals[i] + a_priors_gamma[i], 1 / (sums[i] + b_priors_gamma[i]), sim_count) for i in range(len(totals))]
+        [
+            rng.gamma(
+                totals[i] + a_priors_gamma[i],
+                1 / (sums[i] + b_priors_gamma[i]),
+                sim_count,
+            )
+            for i in range(len(totals))
+        ]
     )

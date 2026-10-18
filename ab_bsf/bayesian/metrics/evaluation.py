@@ -69,10 +69,14 @@ def estimate_expected_loss(data: np.ndarray, min_is_best: bool = False) -> List[
     return [float(x) for x in np.abs(np.mean(best - data, axis=1)).round(7)]
 
 
-def estimate_credible_intervals(data: np.ndarray, alpha: float = 0.95) -> List[List[float]]:
+def estimate_credible_intervals(
+    data: np.ndarray, alpha: float = 0.95
+) -> List[List[float]]:
     """Equal-tailed credible interval of probability ``alpha`` for each row."""
     if not 0 <= alpha <= 1:
-        raise ValueError("Credible interval's probability alpha has to be between 0 and 1.")
+        raise ValueError(
+            "Credible interval's probability alpha has to be between 0 and 1."
+        )
     lo, hi = (1 - alpha) / 2, (1 + alpha) / 2
     return np.round(np.quantile(np.asarray(data), [lo, hi], axis=1).T, 7).tolist()
 
@@ -83,7 +87,9 @@ def _relative_draws(data: np.ndarray, reference_idx: int) -> np.ndarray:
     return (data - ref) / np.abs(ref_safe)
 
 
-def estimate_relative_differences(data: np.ndarray, reference_idx: int = 0) -> List[float]:
+def estimate_relative_differences(
+    data: np.ndarray, reference_idx: int = 0
+) -> List[float]:
     """
     Posterior mean of (variant - reference) / |reference| for each row
     (0 for the reference itself).
@@ -94,7 +100,9 @@ def estimate_relative_differences(data: np.ndarray, reference_idx: int = 0) -> L
     return out
 
 
-def estimate_relative_credible_intervals(data: np.ndarray, reference_idx: int = 0, alpha: float = 0.95) -> List[List[float]]:
+def estimate_relative_credible_intervals(
+    data: np.ndarray, reference_idx: int = 0, alpha: float = 0.95
+) -> List[List[float]]:
     """Credible intervals for the relative difference vs the reference."""
     rel = _relative_draws(np.asarray(data, dtype=float), reference_idx)
     out = estimate_credible_intervals(rel, alpha)
@@ -102,7 +110,9 @@ def estimate_relative_credible_intervals(data: np.ndarray, reference_idx: int = 
     return out
 
 
-def _summarise(samples, min_is_best, interval_alpha) -> Tuple[List[float], List[float], List[List[float]]]:
+def _summarise(
+    samples, min_is_best, interval_alpha
+) -> Tuple[List[float], List[float], List[List[float]]]:
     return (
         estimate_probabilities(samples, min_is_best),
         estimate_expected_loss(samples, min_is_best),
@@ -117,23 +127,63 @@ def _fill(values: Optional[List], default, n: int) -> List:
 # ---------------------------------------------------------------------------
 # Posterior draws of the mean metric per variant
 # ---------------------------------------------------------------------------
-def sample_bernoulli_agg(totals, positives, a_priors_beta=None, b_priors_beta=None, sim_count=20000, seed=None) -> np.ndarray:
+def sample_bernoulli_agg(
+    totals,
+    positives,
+    a_priors_beta=None,
+    b_priors_beta=None,
+    sim_count=20000,
+    seed=None,
+) -> np.ndarray:
     """Conversion-rate draws, Beta-Bernoulli. Default prior Beta(0.5, 0.5)."""
     if len(totals) != len(positives):
         raise ValueError("totals and positives need to have the same length")
     n = len(totals)
-    return beta_posteriors_all(totals, positives, sim_count, _fill(a_priors_beta, 0.5, n), _fill(b_priors_beta, 0.5, n), seed)
+    return beta_posteriors_all(
+        totals,
+        positives,
+        sim_count,
+        _fill(a_priors_beta, 0.5, n),
+        _fill(b_priors_beta, 0.5, n),
+        seed,
+    )
 
 
 def sample_normal_agg(
-    totals, sums, sums_2, m_priors=None, a_priors_ig=None, b_priors_ig=None, w_priors=None, sim_count=20000, seed=None
+    totals,
+    sums,
+    sums_2,
+    m_priors=None,
+    a_priors_ig=None,
+    b_priors_ig=None,
+    w_priors=None,
+    sim_count=20000,
+    seed=None,
 ) -> np.ndarray:
     """Mean draws, Normal with unknown variance (Normal-Inverse-Gamma)."""
     n = len(totals)
-    m, a, b, w = (_fill(m_priors, 1, n), _fill(a_priors_ig, 0, n), _fill(b_priors_ig, 0, n), _fill(w_priors, 0.01, n))
+    m, a, b, w = (
+        _fill(m_priors, 1, n),
+        _fill(a_priors_ig, 0, n),
+        _fill(b_priors_ig, 0, n),
+        _fill(w_priors, 0.01, n),
+    )
     seeds = np.random.SeedSequence(seed).spawn(n)
     return np.array(
-        [normal_posteriors(totals[i], sums[i], sums_2[i], sim_count, m[i], a[i], b[i], w[i], seeds[i])[0] for i in range(n)]
+        [
+            normal_posteriors(
+                totals[i],
+                sums[i],
+                sums_2[i],
+                sim_count,
+                m[i],
+                a[i],
+                b[i],
+                w[i],
+                seeds[i],
+            )[0]
+            for i in range(n)
+        ]
     )
 
 
@@ -155,12 +205,32 @@ def sample_delta_lognormal_agg(
     n = len(totals)
     seeds = np.random.SeedSequence(seed).spawn(n + 1)
     beta = beta_posteriors_all(
-        totals, non_zeros, sim_count, _fill(a_priors_beta, 0.5, n), _fill(b_priors_beta, 0.5, n), seeds[0]
+        totals,
+        non_zeros,
+        sim_count,
+        _fill(a_priors_beta, 0.5, n),
+        _fill(b_priors_beta, 0.5, n),
+        seeds[0],
     )
-    m, a, b, w = (_fill(m_priors, 1, n), _fill(a_priors_ig, 0, n), _fill(b_priors_ig, 0, n), _fill(w_priors, 0.01, n))
+    m, a, b, w = (
+        _fill(m_priors, 1, n),
+        _fill(a_priors_ig, 0, n),
+        _fill(b_priors_ig, 0, n),
+        _fill(w_priors, 0.01, n),
+    )
     logn = np.array(
         [
-            lognormal_posteriors(non_zeros[i], sum_logs[i], sum_logs_2[i], sim_count, m[i], a[i], b[i], w[i], seeds[i + 1])
+            lognormal_posteriors(
+                non_zeros[i],
+                sum_logs[i],
+                sum_logs_2[i],
+                sim_count,
+                m[i],
+                a[i],
+                b[i],
+                w[i],
+                seeds[i + 1],
+            )
             for i in range(n)
         ]
     )
@@ -185,13 +255,33 @@ def sample_delta_normal_agg(
     n = len(totals)
     seeds = np.random.SeedSequence(seed).spawn(n + 1)
     beta = beta_posteriors_all(
-        totals, non_zeros, sim_count, _fill(a_priors_beta, 0.5, n), _fill(b_priors_beta, 0.5, n), seeds[0]
+        totals,
+        non_zeros,
+        sim_count,
+        _fill(a_priors_beta, 0.5, n),
+        _fill(b_priors_beta, 0.5, n),
+        seeds[0],
     )
-    m, a, b, w = (_fill(m_priors, 1, n), _fill(a_priors_ig, 0, n), _fill(b_priors_ig, 0, n), _fill(w_priors, 0.01, n))
+    m, a, b, w = (
+        _fill(m_priors, 1, n),
+        _fill(a_priors_ig, 0, n),
+        _fill(b_priors_ig, 0, n),
+        _fill(w_priors, 0.01, n),
+    )
     norm = np.array(
         [
             (
-                normal_posteriors(non_zeros[i], sums[i], sums_2[i], sim_count, m[i], a[i], b[i], w[i], seeds[i + 1])[0]
+                normal_posteriors(
+                    non_zeros[i],
+                    sums[i],
+                    sums_2[i],
+                    sim_count,
+                    m[i],
+                    a[i],
+                    b[i],
+                    w[i],
+                    seeds[i + 1],
+                )[0]
                 if non_zeros[i] > 0
                 else np.zeros(sim_count)
             )
@@ -201,24 +291,40 @@ def sample_delta_normal_agg(
     return beta * norm
 
 
-def sample_poisson_agg(totals, sums, a_priors_gamma=None, b_priors_gamma=None, sim_count=20000, seed=None) -> np.ndarray:
+def sample_poisson_agg(
+    totals, sums, a_priors_gamma=None, b_priors_gamma=None, sim_count=20000, seed=None
+) -> np.ndarray:
     """Poisson-rate draws, Gamma-Poisson. Default prior Gamma(0.1, 0.1)."""
     n = len(totals)
     return pois_gamma_posteriors_all(
-        totals, sums, sim_count, _fill(a_priors_gamma, 0.1, n), _fill(b_priors_gamma, 0.1, n), seed
+        totals,
+        sums,
+        sim_count,
+        _fill(a_priors_gamma, 0.1, n),
+        _fill(b_priors_gamma, 0.1, n),
+        seed,
     )
 
 
-def sample_exponential_agg(totals, sums, a_priors_gamma=None, b_priors_gamma=None, sim_count=20000, seed=None) -> np.ndarray:
+def sample_exponential_agg(
+    totals, sums, a_priors_gamma=None, b_priors_gamma=None, sim_count=20000, seed=None
+) -> np.ndarray:
     """Mean (1 / rate) draws, Gamma-Exponential. Default prior Gamma(0.1, 0.1)."""
     n = len(totals)
     rate = exp_gamma_posteriors_all(
-        totals, sums, sim_count, _fill(a_priors_gamma, 0.1, n), _fill(b_priors_gamma, 0.1, n), seed
+        totals,
+        sums,
+        sim_count,
+        _fill(a_priors_gamma, 0.1, n),
+        _fill(b_priors_gamma, 0.1, n),
+        seed,
     )
     return np.reciprocal(rate)
 
 
-def sample_numerical_dirichlet_agg(states, concentrations, prior_alphas=None, sim_count=20000, seed=None) -> np.ndarray:
+def sample_numerical_dirichlet_agg(
+    states, concentrations, prior_alphas=None, sim_count=20000, seed=None
+) -> np.ndarray:
     """Expected-value draws for categorical numeric outcomes (e.g. 1-5 star ratings)."""
     if not prior_alphas:
         prior_alphas = [[1] * len(states) for _ in concentrations]
@@ -226,7 +332,10 @@ def sample_numerical_dirichlet_agg(states, concentrations, prior_alphas=None, si
     states = np.asarray(states, dtype=float)
     return np.array(
         [
-            dirichlet_posteriors(concentrations[i], prior_alphas[i], sim_count, seeds[i]) @ states
+            dirichlet_posteriors(
+                concentrations[i], prior_alphas[i], sim_count, seeds[i]
+            )
+            @ states
             for i in range(len(concentrations))
         ]
     )
@@ -247,7 +356,9 @@ def eval_bernoulli_agg(
 ):
     if len(totals) == 0:
         return [], [], []
-    s = sample_bernoulli_agg(totals, positives, a_priors_beta, b_priors_beta, sim_count, seed)
+    s = sample_bernoulli_agg(
+        totals, positives, a_priors_beta, b_priors_beta, sim_count, seed
+    )
     return _summarise(s, min_is_best, interval_alpha)
 
 
@@ -266,7 +377,17 @@ def eval_normal_agg(
 ):
     if len(totals) == 0:
         return [], [], []
-    s = sample_normal_agg(totals, sums, sums_2, m_priors, a_priors_ig, b_priors_ig, w_priors, sim_count, seed)
+    s = sample_normal_agg(
+        totals,
+        sums,
+        sums_2,
+        m_priors,
+        a_priors_ig,
+        b_priors_ig,
+        w_priors,
+        sim_count,
+        seed,
+    )
     return _summarise(s, min_is_best, interval_alpha)
 
 
@@ -347,27 +468,53 @@ def eval_delta_normal_agg(
 
 
 def eval_poisson_agg(
-    totals, sums, a_priors_gamma=None, b_priors_gamma=None, sim_count=20000, seed=None, min_is_best=False, interval_alpha=0.95
+    totals,
+    sums,
+    a_priors_gamma=None,
+    b_priors_gamma=None,
+    sim_count=20000,
+    seed=None,
+    min_is_best=False,
+    interval_alpha=0.95,
 ):
     if len(totals) == 0:
         return [], [], []
-    s = sample_poisson_agg(totals, sums, a_priors_gamma, b_priors_gamma, sim_count, seed)
+    s = sample_poisson_agg(
+        totals, sums, a_priors_gamma, b_priors_gamma, sim_count, seed
+    )
     return _summarise(s, min_is_best, interval_alpha)
 
 
 def eval_exponential_agg(
-    totals, sums, a_priors_gamma=None, b_priors_gamma=None, sim_count=20000, seed=None, min_is_best=False, interval_alpha=0.95
+    totals,
+    sums,
+    a_priors_gamma=None,
+    b_priors_gamma=None,
+    sim_count=20000,
+    seed=None,
+    min_is_best=False,
+    interval_alpha=0.95,
 ):
     if len(totals) == 0:
         return [], [], []
-    s = sample_exponential_agg(totals, sums, a_priors_gamma, b_priors_gamma, sim_count, seed)
+    s = sample_exponential_agg(
+        totals, sums, a_priors_gamma, b_priors_gamma, sim_count, seed
+    )
     return _summarise(s, min_is_best, interval_alpha)
 
 
 def eval_numerical_dirichlet_agg(
-    states, concentrations, prior_alphas=None, sim_count=20000, seed=None, min_is_best=False, interval_alpha=0.95
+    states,
+    concentrations,
+    prior_alphas=None,
+    sim_count=20000,
+    seed=None,
+    min_is_best=False,
+    interval_alpha=0.95,
 ):
     if len(concentrations) == 0:
         return [], [], []
-    s = sample_numerical_dirichlet_agg(states, concentrations, prior_alphas, sim_count, seed)
+    s = sample_numerical_dirichlet_agg(
+        states, concentrations, prior_alphas, sim_count, seed
+    )
     return _summarise(s, min_is_best, interval_alpha)

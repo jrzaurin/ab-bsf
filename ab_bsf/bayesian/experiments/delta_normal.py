@@ -12,8 +12,6 @@ class DeltaNormalBayesianTest(BaseBayesianTest):
     or negative (P&L, net deposits): P(non-zero) ~ Beta, non-zeros ~ Normal.
     """
 
-    _aggregate_keys = ("totals", "non_zeros", "sum_values", "sum_values_2")
-
     @property
     def totals(self):
         return self._values("totals")
@@ -52,8 +50,13 @@ class DeltaNormalBayesianTest(BaseBayesianTest):
             "totals": self.totals,
             "non_zeros": self.non_zeros,
             "sum_values": [round(s, 5) for s in self.sum_values],
-            "avg_values": [round(s / t, 5) for s, t in zip(self.sum_values, self.totals)],
-            "avg_non_zero_values": [round(s / n, 5) if n else 0.0 for s, n in zip(self.sum_values, self.non_zeros)],
+            "avg_values": [
+                round(s / t, 5) for s, t in zip(self.sum_values, self.totals)
+            ],
+            "avg_non_zero_values": [
+                round(s / n, 5) if n else 0.0
+                for s, n in zip(self.sum_values, self.non_zeros)
+            ],
         }
 
     def add_variant_data_agg(
@@ -73,12 +76,19 @@ class DeltaNormalBayesianTest(BaseBayesianTest):
     ) -> None:
         """Add aggregated delta-normal data (sums are over the non-zero values)."""
         if a_prior_beta <= 0 or b_prior_beta <= 0:
-            raise ValueError("Both [a_prior_beta, b_prior_beta] have to be positive numbers.")
+            raise ValueError(
+                "Both [a_prior_beta, b_prior_beta] have to be positive numbers."
+            )
         if totals <= 0 or non_zeros < 0 or totals < non_zeros:
             raise ValueError("Need totals > 0 and 0 <= non_zeros <= totals.")
         self._store(
             name,
-            {"totals": totals, "non_zeros": non_zeros, "sum_values": sum_values, "sum_values_2": sum_values_2},
+            {
+                "totals": totals,
+                "non_zeros": non_zeros,
+                "sum_values": sum_values,
+                "sum_values_2": sum_values_2,
+            },
             {
                 "a_prior_beta": a_prior_beta,
                 "b_prior_beta": b_prior_beta,

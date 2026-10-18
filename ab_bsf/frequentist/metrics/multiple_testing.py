@@ -19,5 +19,10 @@ def adjust_p_values(
     across treatment arms, "fdr_bh" for exploratory KPIs.
     """
     keys = list(results)
-    reject, adj, _, _ = multipletests([results[k][p_value_key] for k in keys], alpha=alpha, method=method)
-    return {k: {**results[k], f"{p_value_key}_adjusted": float(a), "reject": bool(r)} for k, a, r in zip(keys, adj, reject)}
+    reject, adj, _, _ = multipletests(
+        [results[k][p_value_key] for k in keys], alpha=alpha, method=method
+    )
+    return {
+        k: {**results[k], f"{p_value_key}_adjusted": float(a), "reject": bool(r)}
+        for k, a, r in zip(keys, adj, reject)
+    }

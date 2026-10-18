@@ -33,12 +33,16 @@ Results = Dict[str, Dict[str, float]]
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
-def _resolve_groups(df: pd.DataFrame, group_col: str, reference_group: Optional[str]) -> tuple:
+def _resolve_groups(
+    df: pd.DataFrame, group_col: str, reference_group: Optional[str]
+) -> tuple:
     groups = sorted(df[group_col].unique())
     if reference_group is None:
         reference_group = "control" if "control" in groups else groups[0]
     if reference_group not in groups:
-        raise ValueError(f"reference_group '{reference_group}' not found in groups: {groups}")
+        raise ValueError(
+            f"reference_group '{reference_group}' not found in groups: {groups}"
+        )
     return reference_group, [g for g in groups if g != reference_group]
 
 
@@ -59,7 +63,9 @@ def _p_value(t_stat: float, dof: float, alternative: Alternative) -> float:
     raise ValueError("alternative must be 'two-sided', 'larger' or 'smaller'")
 
 
-def _welch(xt: np.ndarray, xc: np.ndarray, confidence_level: float, alternative: Alternative) -> Dict[str, float]:
+def _welch(
+    xt: np.ndarray, xc: np.ndarray, confidence_level: float, alternative: Alternative
+) -> Dict[str, float]:
     """Welch t-test of mean(xt) - mean(xc) with CI and Cohen's d."""
     nt, nc = len(xt), len(xc)
     if nt < 2 or nc < 2:
@@ -67,7 +73,12 @@ def _welch(xt: np.ndarray, xc: np.ndarray, confidence_level: float, alternative:
     mt, mc = xt.mean(), xc.mean()
     vt, vc = xt.var(ddof=1), xc.var(ddof=1)
     se = np.sqrt(vt / nt + vc / nc)
-    dof = (vt / nt + vc / nc) ** 2 / ((vt / nt) ** 2 / (nt - 1) + (vc / nc) ** 2 / (nc - 1)) if se > 0 else nt + nc - 2
+    dof = (
+        (vt / nt + vc / nc) ** 2
+        / ((vt / nt) ** 2 / (nt - 1) + (vc / nc) ** 2 / (nc - 1))
+        if se > 0
+        else nt + nc - 2
+    )
     diff = mt - mc
     t_stat = diff / se if se > 0 else 0.0
     t_crit = stats.t.ppf(1 - (1 - confidence_level) / 2, dof)
@@ -95,10 +106,20 @@ def _relative(w: Dict[str, float]) -> Dict[str, float]:
     """Relative difference mean_t / mean_c - 1 with a delta-method CI (both means uncertain)."""
     mt, mc = w["mean_t"], w["mean_c"]
     if mc == 0:
-        return {"relative_difference": float("inf"), "relative_ci_lower": float("nan"), "relative_ci_upper": float("nan")}
+        return {
+            "relative_difference": float("inf"),
+            "relative_ci_lower": float("nan"),
+            "relative_ci_upper": float("nan"),
+        }
     ratio = mt / mc
-    rel_var = (w["var_t"] / (w["n_t"] * mt**2) if mt != 0 else 0.0) + w["var_c"] / (w["n_c"] * mc**2)
-    se = abs(ratio) * np.sqrt(rel_var) if mt != 0 else np.sqrt(w["var_t"] / w["n_t"]) / abs(mc)
+    rel_var = (w["var_t"] / (w["n_t"] * mt**2) if mt != 0 else 0.0) + w["var_c"] / (
+        w["n_c"] * mc**2
+    )
+    se = (
+        abs(ratio) * np.sqrt(rel_var)
+        if mt != 0
+        else np.sqrt(w["var_t"] / w["n_t"]) / abs(mc)
+    )
     return {
         "relative_difference": float(ratio - 1),
         "relative_ci_lower": float(ratio - 1 - w["t_crit"] * se),
@@ -139,17 +160,33 @@ def t_test(
     ``p_values``, ``effect_sizes`` (Cohen's d), ``n_control``, ``n_feature``.
     """
     dfc = df.copy()
-    dfc = _winsorize_cols(dfc, [target_col], winsorization_method, group_col, winsorize_lower, winsorize_upper)
+    dfc = _winsorize_cols(
+        dfc,
+        [target_col],
+        winsorization_method,
+        group_col,
+        winsorize_lower,
+        winsorize_upper,
+    )
     if covariate_col is not None:
         dfc[target_col] = cuped_adjustment(dfc, target_col, covariate_col)
     if agg_col is not None:
-        dfc = dfc.groupby([agg_col, group_col], observed=True)[target_col].mean().reset_index()
+        dfc = (
+            dfc.groupby([agg_col, group_col], observed=True)[target_col]
+            .mean()
+            .reset_index()
+        )
 
     ref, others = _resolve_groups(dfc, group_col, reference_group)
     xc = dfc.loc[dfc[group_col] == ref, target_col].to_numpy(float)
     out: Results = {}
     for g in others:
-        w = _welch(dfc.loc[dfc[group_col] == g, target_col].to_numpy(float), xc, confidence_level, alternative)
+        w = _welch(
+            dfc.loc[dfc[group_col] == g, target_col].to_numpy(float),
+            xc,
+            confidence_level,
+            alternative,
+        )
         out[f"{g}_vs_{ref}"] = {
             "control_mean": w["mean_c"],
             "feature_mean": w["mean_t"],
@@ -193,7 +230,14 @@ def t_test_delta_lognormal(
     Also returns the overall Welch test on raw means for reference.
     """
     dfc = df.copy()
-    dfc = _winsorize_cols(dfc, [target_col], winsorization_method, group_col, winsorize_lower, winsorize_upper)
+    dfc = _winsorize_cols(
+        dfc,
+        [target_col],
+        winsorization_method,
+        group_col,
+        winsorize_lower,
+        winsorize_upper,
+    )
     if (dfc[target_col] < 0).any():
         raise ValueError("t_test_delta_lognormal needs non-negative values")
     alpha = 1 - confidence_level
@@ -264,14 +308,20 @@ def t_test_delta_lognormal(
             "p_value_conversion": p_conv,
             "n_converters_control": int(cc.sum()),
             "n_converters_feature": int(ct.sum()),
-            "geometric_mean_control": float(np.exp(lc.mean())) if len(lc) else float("nan"),
-            "geometric_mean_feature": float(np.exp(lt.mean())) if len(lt) else float("nan"),
+            "geometric_mean_control": (
+                float(np.exp(lc.mean())) if len(lc) else float("nan")
+            ),
+            "geometric_mean_feature": (
+                float(np.exp(lt.mean())) if len(lt) else float("nan")
+            ),
             **mag,
             "alpha_per_part": alpha_part,
             "significant_conversion": bool(sig_conv),
             "significant_magnitude": bool(sig_mag),
             "which_significant": (
-                "both" if sig_conv and sig_mag else "conversion" if sig_conv else "magnitude" if sig_mag else "neither"
+                "both"
+                if sig_conv and sig_mag
+                else "conversion" if sig_conv else "magnitude" if sig_mag else "neither"
             ),
         }
     return out
@@ -280,7 +330,17 @@ def t_test_delta_lognormal(
 # ---------------------------------------------------------------------------
 # difference-in-differences (same units observed pre and post)
 # ---------------------------------------------------------------------------
-def _did_core(dfc, post_col, pre_col, group_col, ref, others, confidence_level, alternative, log_space):
+def _did_core(
+    dfc,
+    post_col,
+    pre_col,
+    group_col,
+    ref,
+    others,
+    confidence_level,
+    alternative,
+    log_space,
+):
     def arrays(g):
         sub = dfc[dfc[group_col] == g]
         post, pre = sub[post_col].to_numpy(float), sub[pre_col].to_numpy(float)
@@ -310,7 +370,9 @@ def _did_core(dfc, post_col, pre_col, group_col, ref, others, confidence_level, 
             "feature_post_mean": t_post.mean(),
         }
         if log_space:
-            res.update({k: float(np.exp(v)) for k, v in means.items()})  # geometric means
+            res.update(
+                {k: float(np.exp(v)) for k, v in means.items()}
+            )  # geometric means
             res.update(
                 {
                     "relative_did": float(np.exp(w["diff"]) - 1),
@@ -320,7 +382,9 @@ def _did_core(dfc, post_col, pre_col, group_col, ref, others, confidence_level, 
             )
         else:
             res.update({k: float(v) for k, v in means.items()})
-            counterfactual = means["feature_pre_mean"] + (means["control_post_mean"] - means["control_pre_mean"])
+            counterfactual = means["feature_pre_mean"] + (
+                means["control_post_mean"] - means["control_pre_mean"]
+            )
             if counterfactual != 0:
                 res.update(
                     {
@@ -331,7 +395,11 @@ def _did_core(dfc, post_col, pre_col, group_col, ref, others, confidence_level, 
                 )
             else:
                 res.update(
-                    {"relative_did": float("nan"), "relative_ci_lower": float("nan"), "relative_ci_upper": float("nan")}
+                    {
+                        "relative_did": float("nan"),
+                        "relative_ci_lower": float("nan"),
+                        "relative_ci_upper": float("nan"),
+                    }
                 )
         out[f"{g}_vs_{ref}"] = res
     return out
@@ -358,10 +426,25 @@ def t_test_did(
     DiD CI by that level and ignores the level's own uncertainty.
     """
     dfc = _winsorize_cols(
-        df.copy(), [target_col, target_pre_col], winsorization_method, group_col, winsorize_lower, winsorize_upper
+        df.copy(),
+        [target_col, target_pre_col],
+        winsorization_method,
+        group_col,
+        winsorize_lower,
+        winsorize_upper,
     )
     ref, others = _resolve_groups(dfc, group_col, reference_group)
-    return _did_core(dfc, target_col, target_pre_col, group_col, ref, others, confidence_level, alternative, False)
+    return _did_core(
+        dfc,
+        target_col,
+        target_pre_col,
+        group_col,
+        ref,
+        others,
+        confidence_level,
+        alternative,
+        False,
+    )
 
 
 def t_test_did_log(
@@ -385,7 +468,12 @@ def t_test_did_log(
     raw values, before the log).
     """
     dfc = _winsorize_cols(
-        df.copy(), [target_col, target_pre_col], winsorization_method, group_col, winsorize_lower, winsorize_upper
+        df.copy(),
+        [target_col, target_pre_col],
+        winsorization_method,
+        group_col,
+        winsorize_lower,
+        winsorize_upper,
     )
     if (dfc[target_col] <= 0).any() or (dfc[target_pre_col] <= 0).any():
         raise ValueError(
@@ -393,7 +481,17 @@ def t_test_did_log(
             "filter them or use t_test_did on the raw scale."
         )
     ref, others = _resolve_groups(dfc, group_col, reference_group)
-    return _did_core(dfc, target_col, target_pre_col, group_col, ref, others, confidence_level, alternative, True)
+    return _did_core(
+        dfc,
+        target_col,
+        target_pre_col,
+        group_col,
+        ref,
+        others,
+        confidence_level,
+        alternative,
+        True,
+    )
 
 
 def t_test_did_regr(
@@ -422,13 +520,22 @@ def t_test_did_regr(
     """
     covariate_cols = list(covariate_cols or [])
     dfc = _winsorize_cols(
-        df.copy(), [target_col, target_pre_col], winsorization_method, group_col, winsorize_lower, winsorize_upper
+        df.copy(),
+        [target_col, target_pre_col],
+        winsorization_method,
+        group_col,
+        winsorize_lower,
+        winsorize_upper,
     )
     ref, others = _resolve_groups(dfc, group_col, reference_group)
     dfc = dfc.reset_index(drop=True)
     dfc["_unit"] = np.arange(len(dfc))
     keep = ["_unit", group_col] + covariate_cols
-    pre = dfc[keep + [target_pre_col]].rename(columns={target_pre_col: "_y"}).assign(period=0)
+    pre = (
+        dfc[keep + [target_pre_col]]
+        .rename(columns={target_pre_col: "_y"})
+        .assign(period=0)
+    )
     post = dfc[keep + [target_col]].rename(columns={target_col: "_y"}).assign(period=1)
     long = pd.concat([pre, post], ignore_index=True)
     alpha = 1 - confidence_level
@@ -437,12 +544,21 @@ def t_test_did_regr(
     for g in others:
         sub = long[long[group_col].isin([ref, g])].copy()
         sub["treated"] = (sub[group_col] == g).astype(int)
-        formula = "_y ~ treated + period + treated:period" + "".join(f" + {c}" for c in covariate_cols)
-        model = smf.ols(formula, data=sub).fit(cov_type="cluster", cov_kwds={"groups": sub["_unit"]})
+        formula = "_y ~ treated + period + treated:period" + "".join(
+            f" + {c}" for c in covariate_cols
+        )
+        model = smf.ols(formula, data=sub).fit(
+            cov_type="cluster", cov_kwds={"groups": sub["_unit"]}
+        )
         b3 = "treated:period"
         lo, hi = model.conf_int(alpha=alpha).loc[b3]
         means = sub.groupby(["treated", "period"])["_y"].mean()
-        c_pre, c_post, t_pre, t_post = means[(0, 0)], means[(0, 1)], means[(1, 0)], means[(1, 1)]
+        c_pre, c_post, t_pre, t_post = (
+            means[(0, 0)],
+            means[(0, 1)],
+            means[(1, 0)],
+            means[(1, 1)],
+        )
         counterfactual = t_pre + (c_post - c_pre)
         did = float(model.params[b3])
         out[f"{g}_vs_{ref}"] = {
@@ -452,7 +568,9 @@ def t_test_did_regr(
             "t_statistics": float(model.tvalues[b3]),
             "p_values": float(model.pvalues[b3]),
             "std_error": float(model.bse[b3]),
-            "effect_sizes": did / float(np.sqrt(model.mse_resid)) if model.mse_resid > 0 else 0.0,
+            "effect_sizes": (
+                did / float(np.sqrt(model.mse_resid)) if model.mse_resid > 0 else 0.0
+            ),
             "post_differences": float(t_post - c_post),
             "pre_differences": float(t_pre - c_pre),
             "control_pre_mean": float(c_pre),
@@ -460,7 +578,11 @@ def t_test_did_regr(
             "feature_pre_mean": float(t_pre),
             "feature_post_mean": float(t_post),
             "relative_did": did / counterfactual if counterfactual else float("nan"),
-            "relative_ci_lower": float(lo) / counterfactual if counterfactual else float("nan"),
-            "relative_ci_upper": float(hi) / counterfactual if counterfactual else float("nan"),
+            "relative_ci_lower": (
+                float(lo) / counterfactual if counterfactual else float("nan")
+            ),
+            "relative_ci_upper": (
+                float(hi) / counterfactual if counterfactual else float("nan")
+            ),
         }
     return out

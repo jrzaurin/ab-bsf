@@ -34,14 +34,18 @@ def alias_params(**aliases: Union[str, List[str]]) -> Callable:
         params = inspect.signature(func).parameters
         for canonical in aliases:
             if canonical not in params:
-                raise TypeError(f"{func.__name__} has no parameter '{canonical}' to alias")
+                raise TypeError(
+                    f"{func.__name__} has no parameter '{canonical}' to alias"
+                )
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             for alias, canonical in alias_to_canonical.items():
                 if alias in kwargs:
                     if canonical in kwargs:
-                        raise TypeError(f"{func.__name__}() got both '{canonical}' and its alias '{alias}'")
+                        raise TypeError(
+                            f"{func.__name__}() got both '{canonical}' and its alias '{alias}'"
+                        )
                     kwargs[canonical] = kwargs.pop(alias)
             return func(*args, **kwargs)
 
