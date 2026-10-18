@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
 from scipy.stats import norm, t
 
-from ab_bfs.utils.utils import alias_params
+from ab_bsf.utils.utils import alias_params
 
 TestType = Literal["one_tail", "two_tail"]
 Distribution = Literal["normal", "t"]

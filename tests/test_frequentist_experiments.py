@@ -3,15 +3,15 @@ import pytest
 from statsmodels.stats.power import NormalIndPower
 from statsmodels.stats.proportion import proportion_effectsize
 
-from ab_bfs.frequentist.experiments import (
+from ab_bsf.frequentist.experiments import (
     BinaryFrequentistTest,
     ContinuousFrequentistTest,
     DeltaLognormalFrequentistTest,
     clustered_sample_size,
     design_effect,
 )
-from ab_bfs.frequentist.metrics import t_test_delta_lognormal
-from ab_bfs.utils import alias_params
+from ab_bsf.frequentist.metrics import t_test_delta_lognormal
+from ab_bsf.utils import alias_params
 
 ALT = {"one_tail": "larger", "two_tail": "two-sided"}
 

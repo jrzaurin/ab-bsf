@@ -1,11 +1,11 @@
-# ab_bfs
+# ab_bsf
 
 Bayesian and frequentist A/B testing, structured like
 [bayesian-testing](https://github.com/Matt52/bayesian-testing) (`experiments` + `metrics`)
 for both schools:
 
 ```
-ab_bfs/
+ab_bsf/
 ├── bayesian/
 │   ├── experiments/   BinaryBayesianTest, NormalBayesianTest, DeltaLognormalBayesianTest,
 │   │                  DeltaNormalBayesianTest, ExponentialBayesianTest, PoissonBayesianTest,
@@ -27,7 +27,7 @@ pytest            # 98 tests incl. doctests
 ## Quick tour
 
 ```python
-from ab_bfs.bayesian.experiments import BinaryBayesianTest
+from ab_bsf.bayesian.experiments import BinaryBayesianTest
 t = BinaryBayesianTest()
 t.add_variant_data_agg("control", totals=1000, positives=110)
 t.add_variant_data_agg("treatment", totals=1000, positives=150)
@@ -35,14 +35,14 @@ t.evaluate(seed=1)          # posterior_mean, credible_interval, relative_differ
                             # relative_credible_interval, prob_being_best, expected_loss, posterior_samples
 t.evaluate_with_did(pre_rates={"control": 0.10, "treatment": 0.12})
 
-from ab_bfs.frequentist.experiments import BinaryFrequentistTest
+from ab_bsf.frequentist.experiments import BinaryFrequentistTest
 d = BinaryFrequentistTest(n1=1000, p1=0.05)          # one-tailed, pooled variance by default
 d.sample_size_given_power(p2=0.10)                   # (341, 341)
 d.minimum_detectable_effect()                        # (relative MDE, p2_min) at n1
 d.test_duration(daily_observations=500, mde=0.2)     # days beyond the n1 already collected
 d.mde_given_duration(daily_observations=500, days=14)
 
-from ab_bfs.frequentist.metrics import t_test, t_test_did, t_test_delta_lognormal
+from ab_bsf.frequentist.metrics import t_test, t_test_did, t_test_delta_lognormal
 t_test(df, "revenue", covariate_col="revenue_pre", winsorize_upper=0.99)   # Welch + CUPED
 t_test_did(df, "revenue", "revenue_pre")                                   # per-user changes
 ```
@@ -57,7 +57,7 @@ The original files themselves were not available, so:
 
 | Part | Source |
 |---|---|
-| `bayesian/metrics/posteriors.py`, the Beta/NIG/Gamma/Dirichlet maths | bayesian-testing (MIT, © Matus Baniar), which ab_bfs mirrored |
+| `bayesian/metrics/posteriors.py`, the Beta/NIG/Gamma/Dirichlet maths | bayesian-testing (MIT, © Matus Baniar), which ab_bsf mirrored |
 | Bayesian class names, `relative_difference` / `relative_credible_interval` / `posterior_samples` outputs, `add_variant_data_did` (Normal), `evaluate_with_did` (Binary), `BinaryDidTest` | recovered from chats |
 | `ContinuousFrequentistTest`, `DeltaLognormalFrequentistTest`, `alias_params` usage, `n_variants`/`alpha_`, `test_duration` | recovered from chats |
 | `BaseFrequentistTest`, `BinaryFrequentistTest` internals, `alias_params` body | reconstructed from how they were called |

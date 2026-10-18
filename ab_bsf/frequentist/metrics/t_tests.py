@@ -16,7 +16,7 @@ import pandas as pd
 import statsmodels.formula.api as smf
 from scipy import stats
 
-from ab_bfs.frequentist.metrics.preprocessing import cuped_adjustment, winsorize
+from ab_bsf.frequentist.metrics.preprocessing import cuped_adjustment, winsorize
 
 __all__ = [
     "t_test",

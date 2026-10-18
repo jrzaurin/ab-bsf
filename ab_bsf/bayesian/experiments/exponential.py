@@ -2,8 +2,8 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from ab_bfs.bayesian.experiments.base import BaseBayesianTest
-from ab_bfs.bayesian.metrics.evaluation import sample_exponential_agg
+from ab_bsf.bayesian.experiments.base import BaseBayesianTest
+from ab_bsf.bayesian.metrics.evaluation import sample_exponential_agg
 
 
 class ExponentialBayesianTest(BaseBayesianTest):

@@ -3,8 +3,8 @@ from typing import Optional, Tuple
 import numpy as np
 from scipy.stats import norm
 
-from ab_bfs.frequentist.experiments.base import BaseFrequentistTest, Distribution, TestType
-from ab_bfs.utils.utils import alias_params
+from ab_bsf.frequentist.experiments.base import BaseFrequentistTest, Distribution, TestType
+from ab_bsf.utils.utils import alias_params
 
 
 class ContinuousFrequentistTest(BaseFrequentistTest):

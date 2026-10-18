@@ -4,8 +4,8 @@ import pytest
 import statsmodels.formula.api as smf
 from scipy import stats
 
-from ab_bfs.datasets import make_conversion_data, make_did_data, make_revenue_data
-from ab_bfs.frequentist.metrics import (
+from ab_bsf.datasets import make_conversion_data, make_did_data, make_revenue_data
+from ab_bsf.frequentist.metrics import (
     adjust_p_values,
     cuped_adjustment,
     fixed_effects_linear_regression,

@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from ab_bfs.bayesian.metrics.evaluation import sample_bernoulli_agg
+from ab_bsf.bayesian.metrics.evaluation import sample_bernoulli_agg
 
 _PERIODS = ("pre", "post")
 

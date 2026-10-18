@@ -2,8 +2,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from ab_bfs.bayesian.experiments.base import BaseBayesianTest
-from ab_bfs.bayesian.metrics.evaluation import (
+from ab_bsf.bayesian.experiments.base import BaseBayesianTest
+from ab_bsf.bayesian.metrics.evaluation import (
     estimate_credible_intervals,
     estimate_expected_loss,
     estimate_probabilities,

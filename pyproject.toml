@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ab_bfs"
+name = "ab_bsf"
 version = "0.2.0"
 description = "Bayesian and frequentist A/B testing: design, evaluation, DiD, CUPED"
 readme = "README.md"
@@ -20,10 +20,10 @@ dependencies = [
 dev = ["pytest>=7", "black", "isort", "flake8", "mypy"]
 
 [tool.setuptools.packages.find]
-include = ["ab_bfs*"]
+include = ["ab_bsf*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "ab_bfs"]
+testpaths = ["tests", "ab_bsf"]
 addopts = "--doctest-modules"
 
 [tool.black]

@@ -6,7 +6,7 @@ Two layers:
 * ``sample_*_agg`` functions return the posterior draws of each variant's mean
   metric, shape (n_variants, sim_count).
 * ``estimate_*`` functions summarise any such array: probability of being best,
-  expected loss, credible intervals, and (ab_bfs additions) relative differences
+  expected loss, credible intervals, and (ab_bsf additions) relative differences
   vs a reference variant with their credible intervals.
 
 ``eval_*_agg`` keep the bayesian-testing signature, returning
@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from ab_bfs.bayesian.metrics.posteriors import (
+from ab_bsf.bayesian.metrics.posteriors import (
     beta_posteriors_all,
     dirichlet_posteriors,
     exp_gamma_posteriors_all,

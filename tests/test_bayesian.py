@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy import integrate, stats
 
-from ab_bfs.bayesian.experiments import (
+from ab_bsf.bayesian.experiments import (
     BinaryBayesianTest,
     BinaryDidTest,
     DeltaLognormalBayesianTest,
@@ -12,7 +12,7 @@ from ab_bfs.bayesian.experiments import (
     NormalBayesianTest,
     PoissonBayesianTest,
 )
-from ab_bfs.bayesian.metrics import eval_bernoulli_agg
+from ab_bsf.bayesian.metrics import eval_bernoulli_agg
 
 
 def prob_b_beats_a(a1, b1, a2, b2):

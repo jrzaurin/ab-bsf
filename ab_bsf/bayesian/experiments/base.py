@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from ab_bfs.bayesian.metrics.evaluation import (
+from ab_bsf.bayesian.metrics.evaluation import (
     estimate_credible_intervals,
     estimate_expected_loss,
     estimate_probabilities,

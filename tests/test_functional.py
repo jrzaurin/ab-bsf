@@ -5,7 +5,7 @@ import pytest
 from statsmodels.stats.power import NormalIndPower
 from statsmodels.stats.proportion import proportion_effectsize
 
-from ab_bfs.frequentist.experiments.functional import (
+from ab_bsf.frequentist.experiments.functional import (
     calculate_power_given_sample_size,
     calculate_sample_size_given_power,
     estimate_test_duration,
