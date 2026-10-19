@@ -22,9 +22,9 @@ def winsorize(
     Parameters
     ----------
     winsorization_method :
-        "pooled" (default) computes one pair of caps on all groups together, so every
-        group is treated by the same rule and the cap cannot absorb part of the
-        treatment effect. "group" computes caps within each group.
+        "pooled" (default) computes one pair of caps on all groups together, so
+        every group is treated by the same rule and the cap cannot absorb part
+        of the treatment effect. "group" computes caps within each group.
     lower_percentile, upper_percentile : quantiles in [0, 1]; (0, 1) is a no-op.
 
     Returns

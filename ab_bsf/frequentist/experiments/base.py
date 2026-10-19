@@ -6,15 +6,13 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
 from scipy.stats import norm, t
 
-from ab_bsf.utils.utils import alias_params
-
 TestType = Literal["one_tail", "two_tail"]
 Distribution = Literal["normal", "t"]
 
 
 class BaseFrequentistTest(ABC):
     """
-    Shared machinery for the frequentist design classes.
+    Base class for frequentist design classes.
 
     Parameters
     ----------
@@ -82,40 +80,6 @@ class BaseFrequentistTest(ABC):
         else:
             self.alpha_ = alpha
 
-    # ----------------------------------------------------------------- helpers
-    def _overwrite_sample_size(
-        self, sample_size: Optional[int] = None
-    ) -> Tuple[int, int]:
-        """(control, treatment) sizes: the stored ones, or ``sample_size`` and ``sample_size * ratio``."""
-        if sample_size is None:
-            return self.n1, self.n2
-        return int(sample_size), max(1, int(np.ceil(sample_size * self.ratio - 1e-9)))
-
-    def _z_alpha(
-        self,
-        n_control: Optional[int] = None,
-        n_treatment: Optional[int] = None,
-        alpha: Optional[float] = None,
-    ) -> float:
-        a = self.alpha_ if alpha is None else alpha
-        q = 1 - a / 2 if self.test_type == "two_tail" else 1 - a
-        if (
-            self.distribution == "t"
-            and n_control is not None
-            and n_treatment is not None
-        ):
-            return float(t.ppf(q, n_control + n_treatment - 2))
-        return float(norm.ppf(q))
-
-    def _power_from_z(self, z_stat: float, z_alpha: float) -> float:
-        """Power for a test statistic with mean ``z_stat`` (absolute value) under H1."""
-        z_stat = abs(z_stat)
-        power = 1 - norm.cdf(z_alpha - z_stat)
-        if self.test_type == "two_tail":
-            power += norm.cdf(-z_alpha - z_stat)
-        return float(power)
-
-    # --------------------------------------------------------------- abstract
     @abstractmethod
     def minimum_detectable_effect(
         self, control_sample_size: Optional[int] = None
@@ -131,13 +95,6 @@ class BaseFrequentistTest(ABC):
     @abstractmethod
     def sample_size_given_power(self, p2: float) -> Tuple[int, int]:
         """(control, treatment) sizes needed to detect ``p1`` -> ``p2`` with ``power``."""
-
-    # ----------------------------------------------------------- multivariant
-    def _require_variants(self) -> None:
-        if not hasattr(self, "n_variants"):
-            raise ValueError(
-                "Pass n_variants=... when creating the test to use multivariant methods"
-            )
 
     def sample_size_given_power_multivariant(self, p2: float) -> Tuple[int, List[int]]:
         """Control size and the list of treatment sizes (Bonferroni-corrected alpha)."""
@@ -156,12 +113,6 @@ class BaseFrequentistTest(ABC):
         per = self.power_given_sample_size(p2, control_sample_size)
         return per, 1 - (1 - per) ** (self.n_variants - 1)
 
-    # --------------------------------------------------------------- duration
-    def _target(self, mde: Optional[float]) -> Tuple[float, float]:
-        if mde is None:
-            mde = self.minimum_detectable_effect()[0]
-        return mde, self.p1 * (1 + mde)
-
     def test_duration(
         self,
         daily_observations: int,
@@ -173,11 +124,14 @@ class BaseFrequentistTest(ABC):
 
         Parameters
         ----------
-        daily_observations : new observations per day for the *control* group
-            (treatment groups get ``daily_observations * ratio``).
-        mde : relative lift to detect (e.g. 0.05 = +5%). Defaults to the current MDE.
-        already_collected : if True, the ``n1`` control observations given at
-            construction count towards the requirement; days never go negative.
+        daily_observations : int
+            New observations per day for the *control* group. (treatment groups
+            get ``daily_observations * ratio``).
+        mde : float, optional
+            Relative lift to detect (e.g. 0.05 = +5%). Defaults to the current MDE.
+        already_collected : bool, default True
+            If True, the ``n1`` control observations given at construction count
+            towards the requirement; days never go negative.
 
         Returns
         -------
@@ -206,7 +160,8 @@ class BaseFrequentistTest(ABC):
     def power_over_time(
         self, daily_observations: int, p2: float, max_days: int = 60
     ) -> Tuple[List[int], List[float]]:
-        """Power after each day when control grows by ``daily_observations`` per day (from zero)."""
+        """Power after each day when control grows by ``daily_observations`` per
+        day (from zero)."""
         days = list(range(1, max_days + 1))
         return days, [
             self.power_given_sample_size(p2, daily_observations * d) for d in days
@@ -219,15 +174,16 @@ class BaseFrequentistTest(ABC):
         target_power: Optional[float] = None,
         max_days: int = 365,
     ) -> Optional[int]:
-        """First day on which power reaches ``target_power`` (default: ``self.power``), or None."""
+        """First day on which power reaches ``target_power`` (default:
+        ``self.power``), or None."""
         target_power = self.power if target_power is None else target_power
         days, powers = self.power_over_time(daily_observations, p2, max_days)
         return next((d for d, pw in zip(days, powers) if pw >= target_power), None)
 
     def mde_given_duration(self, daily_observations: int, days: int) -> Dict[str, Any]:
         """
-        What can be detected in a fixed number of days: the MDE at ``self.power``
-        with ``daily_observations * days`` control observations.
+        What can be detected in a fixed number of days: the MDE at
+        ``self.power`` with ``daily_observations * days`` control observations.
         """
         n = int(daily_observations * days)
         mde, target = self.minimum_detectable_effect(control_sample_size=n)
@@ -239,5 +195,50 @@ class BaseFrequentistTest(ABC):
             "power": self.power,
         }
 
+    def _overwrite_sample_size(
+        self, sample_size: Optional[int] = None
+    ) -> Tuple[int, int]:
+        """(control, treatment) sizes: the stored ones, or ``sample_size`` and
+        ``sample_size * ratio``."""
+        if sample_size is None:
+            return self.n1, self.n2
+        return int(sample_size), max(1, int(np.ceil(sample_size * self.ratio - 1e-9)))
 
-__all__ = ["BaseFrequentistTest", "alias_params"]
+    def _z_alpha(
+        self,
+        n_control: Optional[int] = None,
+        n_treatment: Optional[int] = None,
+        alpha: Optional[float] = None,
+    ) -> float:
+        """
+        Compute the critical value from the alpha level and the distribution.
+        """
+        a = self.alpha_ if alpha is None else alpha
+        q = 1 - a / 2 if self.test_type == "two_tail" else 1 - a
+        if (
+            self.distribution == "t"
+            and n_control is not None
+            and n_treatment is not None
+        ):
+            return float(t.ppf(q, n_control + n_treatment - 2))
+        return float(norm.ppf(q))
+
+    def _power_from_z(self, z_stat: float, z_alpha: float) -> float:
+        """Power for a test statistic with mean ``z_stat`` (absolute value) under H1."""
+        z_stat = abs(z_stat)
+        power = 1 - norm.cdf(z_alpha - z_stat)
+        if self.test_type == "two_tail":
+            power += norm.cdf(-z_alpha - z_stat)
+        return float(power)
+
+    def _target(self, mde: Optional[float]) -> Tuple[float, float]:
+        """mde and target metric given an optional relative MDE."""
+        if mde is None:
+            mde = self.minimum_detectable_effect()[0]
+        return mde, self.p1 * (1 + mde)
+
+    def _require_variants(self) -> None:
+        if not hasattr(self, "n_variants"):
+            raise ValueError(
+                "Pass n_variants=... when creating the test to use multivariant methods"
+            )

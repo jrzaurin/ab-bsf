@@ -1,46 +1,20 @@
 import numpy as np
 import pytest
 from statsmodels.stats.power import NormalIndPower
-from statsmodels.stats.proportion import proportion_effectsize
 
 from ab_bsf.frequentist.experiments import (
     BinaryFrequentistTest,
     ContinuousFrequentistTest,
     DeltaLognormalFrequentistTest,
-    clustered_sample_size,
-    design_effect,
 )
 from ab_bsf.frequentist.metrics import t_test_delta_lognormal
 from ab_bsf.utils import alias_params
 
-ALT = {"one_tail": "larger", "two_tail": "two-sided"}
-
 
 # --------------------------------------------------------------------- binary
-@pytest.mark.parametrize("p1,p2", [(0.10, 0.12), (0.05, 0.10), (0.03, 0.0345)])
 @pytest.mark.parametrize("tt", ["one_tail", "two_tail"])
-@pytest.mark.parametrize("ratio", [1.0, 2.0])
-def test_binary_arcsine_matches_statsmodels(p1, p2, tt, ratio):
-    t = BinaryFrequentistTest(
-        n1=1000, p1=p1, test_type=tt, ratio=ratio, use_pooled_variance=False
-    )
-    n1, n2 = t.sample_size_given_power(p2)
-    sm = NormalIndPower().solve_power(
-        proportion_effectsize(p2, p1),
-        alpha=0.05,
-        power=0.8,
-        ratio=ratio,
-        alternative=ALT[tt],
-    )
-    assert 0 <= n1 - sm < 2
-
-
-@pytest.mark.parametrize(
-    "opts", [{}, {"use_pooled_variance": False}, {"p1_observed_var": 0.1 * 0.9}]
-)
-@pytest.mark.parametrize("tt", ["one_tail", "two_tail"])
-def test_binary_round_trips(opts, tt):
-    t = BinaryFrequentistTest(n1=1000, p1=0.1, test_type=tt, **opts)
+def test_binary_round_trips(tt):
+    t = BinaryFrequentistTest(n1=1000, p1=0.1, p1_observed_var=0.09, test_type=tt)
     n1, _ = t.sample_size_given_power(0.12)
     assert 0.8 <= t.power_given_sample_size(0.12, n1) < 0.802
     _, p2 = t.minimum_detectable_effect(n1)
@@ -48,7 +22,8 @@ def test_binary_round_trips(opts, tt):
 
 
 def test_binary_power_by_simulation():
-    t = BinaryFrequentistTest(n1=1000, p1=0.05)  # one tail, pooled
+    # one tail; variance = average of the two arms' binomial variances
+    t = BinaryFrequentistTest(n1=1000, p1=0.05, p1_observed_var=0.06875)
     n, _ = t.sample_size_given_power(0.10)
     rng = np.random.default_rng(0)
     R = 40_000
@@ -59,16 +34,20 @@ def test_binary_power_by_simulation():
 
 
 def test_multivariant_bonferroni_and_duration():
-    t = BinaryFrequentistTest(n1=1000, p1=0.1, n_variants=3)
+    t = BinaryFrequentistTest(n1=1000, p1=0.1, p1_observed_var=0.09, n_variants=3)
     assert t.alpha_ == pytest.approx(0.025)
     n_c, n_ts = t.sample_size_given_power_multivariant(0.12)
     assert n_ts == [n_c, n_c]
-    single = BinaryFrequentistTest(n1=1000, p1=0.1).sample_size_given_power(0.12)[0]
+    single = BinaryFrequentistTest(
+        n1=1000, p1=0.1, p1_observed_var=0.09
+    ).sample_size_given_power(0.12)[0]
     assert n_c > single
     per, overall = t.power_given_sample_size_multivariant(0.12, n_c)
     assert overall > per >= 0.8
     with pytest.raises(ValueError):
-        BinaryFrequentistTest(n1=1000, p1=0.1, n_variants=3, ratio=2.0)
+        BinaryFrequentistTest(
+            n1=1000, p1=0.1, p1_observed_var=0.09, n_variants=3, ratio=2.0
+        )
 
 
 def test_duration_never_negative_and_from_scratch():
@@ -83,7 +62,7 @@ def test_duration_never_negative_and_from_scratch():
 
 
 def test_mde_given_duration_uses_fixed_power():
-    t = BinaryFrequentistTest(n1=1000, p1=0.1)
+    t = BinaryFrequentistTest(n1=1000, p1=0.1, p1_observed_var=0.09)
     out = t.mde_given_duration(daily_observations=500, days=14)
     n = out["control_sample_size"]
     assert t.power_given_sample_size(out["target_mean"], n) == pytest.approx(
@@ -165,11 +144,3 @@ def test_delta_lognormal_sample_size_achieves_power_by_simulation():
         hits += r["which_significant"] != "neither"
     # both parts sized for 80% -> P(at least one) should be ~ 1 - 0.2^2 = 0.96
     assert hits / reps > 0.9
-
-
-# ------------------------------------------------------------------ clustered
-def test_design_effect():
-    assert design_effect(20, 0.05) == pytest.approx(1.95)
-    assert design_effect(20, 0.05, cluster_size_cv=0.5) > design_effect(20, 0.05)
-    n_c, n_t, info = clustered_sample_size(1000, 1000, 20, 0.05)
-    assert info["n_clusters_control"] == 98 and n_c == 1960

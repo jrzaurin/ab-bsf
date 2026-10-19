@@ -13,7 +13,7 @@ ab_bsf/
 │   └── metrics/       posteriors.py (conjugate samplers), evaluation.py (P(best), loss, CIs, relative diffs)
 ├── frequentist/
 │   ├── experiments/   design: BinaryFrequentistTest, ContinuousFrequentistTest,
-│   │                  DeltaLognormalFrequentistTest, clustered.py, functional.py
+│   │                  DeltaLognormalFrequentistTest
 │   └── metrics/       evaluation: t_tests.py, regressions.py, preprocessing.py, multiple_testing.py
 ├── datasets/          synthetic generators
 └── utils/             alias_params, ...
@@ -21,7 +21,7 @@ ab_bsf/
 
 ```bash
 pip install -e ".[dev]"
-pytest            # 95 tests incl. doctests
+pytest            # 37 tests incl. doctests
 ```
 
 ## Quick tour
@@ -35,8 +35,8 @@ t.evaluate(seed=1)          # posterior_mean, credible_interval, relative_differ
                             # relative_credible_interval, prob_being_best, expected_loss, posterior_samples
 
 from ab_bsf.frequentist.experiments import BinaryFrequentistTest
-d = BinaryFrequentistTest(n1=1000, p1=0.05)          # one-tailed, pooled variance by default
-d.sample_size_given_power(p2=0.10)                   # (341, 341)
+d = BinaryFrequentistTest(n1=1000, p1=0.05, p1_observed_var=0.0475)  # one-tailed
+d.sample_size_given_power(p2=0.10)                   # (235, 235)
 d.minimum_detectable_effect()                        # (relative MDE, p2_min) at n1
 d.test_duration(daily_observations=500, mde=0.2)     # days beyond the n1 already collected
 d.mde_given_duration(daily_observations=500, days=14)
@@ -67,20 +67,18 @@ The original files themselves were not available, so:
 
 Statistics:
 
-1. **Arcsine sample size / power / MDE**: the "1/4 factor" added in July 2025 was wrong
-   (4x too small samples). Fixed; matches statsmodels.
-2. **`t_test_did_regr`**: SEs are clustered by unit. Plain HC3 on the long panel treats
+1. **`t_test_did_regr`**: SEs are clustered by unit. Plain HC3 on the long panel treats
    each user's pre and post rows as independent and overstates the SE (by >1.5x in the tests).
-3. **`t_test`** is Welch throughout (one version mixed a pooled-variance p-value with a Welch CI);
+2. **`t_test`** is Welch throughout (one version mixed a pooled-variance p-value with a Welch CI);
    relative CIs use the delta method for a ratio of means, not `se / |control_mean|`.
-4. **`t_test_delta_lognormal`**: magnitude lift is the geometric-mean ratio `exp(diff) - 1`,
+3. **`t_test_delta_lognormal`**: magnitude lift is the geometric-mean ratio `exp(diff) - 1`,
    consistent with its log-scale test.
-5. **`test_duration`** never returns negative days (`already_collected=False` plans from zero).
-6. **`mde_given_duration`** uses a fixed power; the chat's "MDE at achievable power" was circular.
-7. **`winsorize`** defaults to `"pooled"` caps; per-group caps can shave off part of the treatment effect.
-8. **DeltaLognormal design**: the lift split between conversion and magnitude is
+4. **`test_duration`** never returns negative days (`already_collected=False` plans from zero).
+5. **`mde_given_duration`** uses a fixed power; the chat's "MDE at achievable power" was circular.
+6. **`winsorize`** defaults to `"pooled"` caps; per-group caps can shave off part of the treatment effect.
+7. **DeltaLognormal design**: the lift split between conversion and magnitude is
    multiplicative (`conversion_share`), and two-tailed power includes the opposite tail.
-9. **Bayesian delta-lognormal** allows negative `m_prior` (log means can be negative) and `min_positive`
+8. **Bayesian delta-lognormal** allows negative `m_prior` (log means can be negative) and `min_positive`
    (drops dust before logging).
 
 Left out on purpose:
