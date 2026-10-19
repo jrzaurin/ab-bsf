@@ -1,8 +1,9 @@
 """
 Posterior samplers for the conjugate models.
 
-Adapted from Matus Baniar's bayesian-testing (MIT licence,
-https://github.com/Matt52/bayesian-testing), which ab_bsf mirrored.
+Adapted from Matus Baniar's bayesian-testing, which ab_bsf mirrored.
+
+Credit to the original author.
 """
 
 from typing import List, Tuple, Union

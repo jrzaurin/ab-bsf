@@ -11,6 +11,14 @@ class PoissonBayesianTest(BaseBayesianTest):
     Bayesian A/B test for counts (trades per session, sessions per user),
     Gamma-Poisson conjugate model. The compared metric is the Poisson rate.
 
+    - Likelihood: each observation is Poisson(rate). The data enters only through
+      ``totals`` (number of observations) and ``sum_values`` (total count).
+    - Prior: ``rate ~ Gamma(a_prior, b_prior)`` with ``b_prior`` as the rate
+      parameter. Read it as ``a_prior`` events seen over ``b_prior`` observations
+      before the experiment (default 0.1 and 0.1, very weak).
+    - Posterior: ``rate | data ~ Gamma(a_prior + sum_values, b_prior + totals)``,
+      with mean ``(a_prior + sum_values) / (b_prior + totals)``.
+
     Note: heavily over-dispersed counts (variance >> mean) make the Poisson
     posterior too narrow; check var/mean before trusting the intervals.
     """
@@ -45,7 +53,7 @@ class PoissonBayesianTest(BaseBayesianTest):
             ],
         }
 
-    def _posterior_means(self, samples):
+    def _posterior_means(self):
         return [
             round((a + s) / (b + t), 5)
             for s, t, a, b in zip(

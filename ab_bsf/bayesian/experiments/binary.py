@@ -67,7 +67,7 @@ class BinaryBayesianTest(BaseBayesianTest):
             self.totals, self.positives, self.a_priors, self.b_priors, sim_count, seed
         )
 
-    def _posterior_means(self, samples: np.ndarray) -> List[float]:
+    def _posterior_means(self) -> List[float]:
         return [
             round((a + p) / (a + b + t), 5)
             for p, t, a, b in zip(

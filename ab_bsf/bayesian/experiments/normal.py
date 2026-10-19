@@ -8,8 +8,26 @@ from ab_bsf.bayesian.metrics.evaluation import sample_normal_agg
 
 class NormalBayesianTest(BaseBayesianTest):
     """
-    Bayesian A/B test for normal data, unknown mean and variance
-    (Normal-Inverse-Gamma conjugate prior).
+    Bayesian A/B test for normal data with unknown mean and variance,
+    Normal-Inverse-Gamma conjugate model. The compared metric is the mean ``mu``.
+
+    - Likelihood: each observation is Normal(mu, sigma^2). The data enters only
+      through ``totals``, ``sum_values`` and ``sum_values_2`` (sum of squares), which
+      is why it can be passed raw or already aggregated.
+    - Prior: ``sigma^2 ~ InverseGamma(a_prior_ig, b_prior_ig)`` and
+      ``mu | sigma^2 ~ Normal(m_prior, sigma^2 / w_prior)``. ``m_prior`` is the prior
+      mean and ``w_prior`` its weight in pseudo-observations (0.01 is very weak).
+      The Inverse-Gamma parameters can be 0 because there is always at least one
+      observation.
+    - Posterior: same Normal-Inverse-Gamma form, with the data added to the prior.
+      The posterior mean of ``mu`` is
+      ``(sum_values + w_prior * m_prior) / (totals + w_prior)``, a weighted average
+      of the prior mean and the sample mean.
+
+    Conjugacy means the posterior stays in the prior's family, so the update has a
+    closed form. The test draws ``mu`` from each variant's posterior and compares
+    variants draw by draw to get the probability of being best, the expected loss and
+    credible intervals reported by ``evaluate``.
     """
 
     @property
@@ -62,7 +80,7 @@ class NormalBayesianTest(BaseBayesianTest):
             ],
         }
 
-    def _posterior_means(self, samples):
+    def _posterior_means(self):
         return [
             round((s + w * m) / (t + w), 5)
             for s, t, m, w in zip(

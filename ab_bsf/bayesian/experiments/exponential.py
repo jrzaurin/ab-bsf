@@ -9,8 +9,22 @@ from ab_bsf.bayesian.metrics.evaluation import sample_exponential_agg
 class ExponentialBayesianTest(BaseBayesianTest):
     """
     Bayesian A/B test for positive durations (session time, time to first trade),
-    Gamma-Exponential conjugate model. The compared metric is the mean, 1 / rate.
-    Use ``evaluate(min_is_best=True)`` when shorter is better.
+    Gamma-Exponential conjugate model. The compared metric is the mean duration,
+    ``1 / rate``. Use ``evaluate(min_is_best=True)`` when shorter is better.
+
+    - Likelihood: each observation is Exponential(rate). The data enters only
+      through ``totals`` (number of observations) and ``sum_values`` (total time).
+    - Prior: ``rate ~ Gamma(a_prior, b_prior)`` with ``b_prior`` as the rate
+      parameter. Read it as ``a_prior`` events seen over ``b_prior`` units of time
+      before the experiment (default 0.1 and 0.1, very weak).
+    - Posterior: ``rate | data ~ Gamma(a_prior + totals, b_prior + sum_values)``.
+      The mean duration ``1 / rate`` is then Inverse-Gamma, with mean
+      ``(b_prior + sum_values) / (a_prior + totals - 1)``.
+
+    Conjugacy means the posterior stays in the prior's family, so the update has a
+    closed form. The test draws the rate from each variant's posterior, inverts it,
+    and compares variants draw by draw to get the probability of being best, the
+    expected loss and credible intervals reported by ``evaluate``.
     """
 
     @property
@@ -43,16 +57,12 @@ class ExponentialBayesianTest(BaseBayesianTest):
             ],
         }
 
-    def _posterior_means(self, samples):
+    def _posterior_means(self):
         # E[1/lambda] for lambda ~ Gamma(a + n, b + sum) is (b + sum) / (a + n - 1)
         return [
-            (
-                round((b + s) / (a + t - 1), 5)
-                if a + t > 1
-                else float(np.round(samples[i].mean(), 5))
-            )
-            for i, (s, t, a, b) in enumerate(
-                zip(self.sum_values, self.totals, self.a_priors, self.b_priors)
+            round((b + s) / (a + t - 1), 5)
+            for s, t, a, b in zip(
+                self.sum_values, self.totals, self.a_priors, self.b_priors
             )
         ]
 

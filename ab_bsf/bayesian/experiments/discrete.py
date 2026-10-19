@@ -9,7 +9,23 @@ from ab_bsf.bayesian.metrics.evaluation import sample_numerical_dirichlet_agg
 class DiscreteBayesianTest(BaseBayesianTest):
     """
     Bayesian A/B test for numeric categorical outcomes (dice, 1-5 star ratings),
-    Dirichlet-Multinomial model. The compared metric is the expected value.
+    Dirichlet-Multinomial conjugate model. The compared metric is the expected value.
+
+    This is the multi-category version of ``BinaryBayesianTest``: the Multinomial
+    generalises the Binomial, and the Dirichlet generalises the Beta.
+
+    - Likelihood: the count of each category follows a Multinomial(n, p), where
+      ``p`` is the vector of category probabilities. The data enters only through
+      the ``concentration`` (the count per category).
+    - Prior: ``p ~ Dirichlet(prior)``, one pseudo-count per category (default 1 each,
+      i.e. uniform).
+    - Posterior: ``p | data ~ Dirichlet(prior + concentration)``, with mean
+      probabilities ``(prior_k + count_k) / sum_j (prior_j + count_j)``.
+
+    The metric is the expected value of the outcome, ``sum_k category_k x p_k``.
+    The test draws ``p`` from each variant's posterior, converts every draw to its
+    expected value, and compares variants draw by draw to get the probability of
+    being best, the expected loss and credible intervals reported by ``evaluate``.
 
     Parameters
     ----------
@@ -54,6 +70,15 @@ class DiscreteBayesianTest(BaseBayesianTest):
                 for c in self.concentrations
             ],
         }
+
+    def _posterior_means(self):
+        # E[p_k] = (prior_k + count_k) / sum_j (prior_j + count_j), so the expected
+        # value is the dot product of the categories with that mean probability
+        cats = np.asarray(self.categories, dtype=float)
+        return [
+            round(float(np.dot(np.add(p, c), cats) / (np.sum(p) + np.sum(c))), 5)
+            for p, c in zip(self._values("prior"), self.concentrations)
+        ]
 
     def add_variant_data_agg(
         self,

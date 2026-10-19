@@ -8,10 +8,27 @@ from ab_bsf.bayesian.metrics.evaluation import sample_delta_lognormal_agg
 
 class DeltaLognormalBayesianTest(BaseBayesianTest):
     """
-    Bayesian A/B test for zero-inflated, right-skewed data (revenue or volume per
-    session): P(non-zero) ~ Beta-Bernoulli, non-zero values ~ LogNormal.
+    Bayesian A/B test for zero-inflated, right-skewed data (revenue or volume
+    per session), with two conjugate models combined.
 
-    The compared metric is the mean per observation, P(non-zero) x E[value | non-zero].
+    Each variant's data is split in two parts, modelled independently:
+
+    1. Whether an observation is non-zero. Same model as ``BinaryBayesianTest``:
+       ``positives`` out of ``totals`` is Binomial(totals, p), the prior is
+       ``p ~ Beta(a_prior_beta, b_prior_beta)`` and the posterior is
+       ``Beta(a_prior_beta + positives, b_prior_beta + totals - positives)``.
+    2. How large the non-zero values are. They are assumed lognormal, so their
+       logs are Normal(mu, sigma^2) with both parameters unknown. The conjugate
+       prior is Normal-Inverse-Gamma: ``sigma^2 ~ InverseGamma(a_prior_ig, b_prior_ig)``
+       and ``mu | sigma^2 ~ Normal(m_prior, sigma^2 / w_prior)``, where ``w_prior``
+       is the prior's weight in pseudo-observations. The posterior has the same
+       form, with the data added to those parameters.
+
+    The compared metric is the mean per observation, which combines both parts:
+    ``p x exp(mu + sigma^2 / 2)``, i.e. P(non-zero) x E[value | non-zero]. The test
+    draws from both posteriors, multiplies the draws, and compares variants draw by
+    draw to get the probability of being best, the expected loss and credible
+    intervals reported by ``evaluate``.
     """
 
     @property
@@ -35,18 +52,17 @@ class DeltaLognormalBayesianTest(BaseBayesianTest):
         return self._values("sum_logs_2")
 
     def _posterior_samples(self, sim_count, seed):
-        v = self._values
         return sample_delta_lognormal_agg(
             self.totals,
             self.positives,
             self.sum_logs,
             self.sum_logs_2,
-            v("a_prior_beta"),
-            v("b_prior_beta"),
-            v("m_prior"),
-            v("a_prior_ig"),
-            v("b_prior_ig"),
-            v("w_prior"),
+            self._values("a_prior_beta"),
+            self._values("b_prior_beta"),
+            self._values("m_prior"),
+            self._values("a_prior_ig"),
+            self._values("b_prior_ig"),
+            self._values("w_prior"),
             sim_count,
             seed,
         )
@@ -64,6 +80,47 @@ class DeltaLognormalBayesianTest(BaseBayesianTest):
                 for s, p in zip(self.sum_values, self.positives)
             ],
         }
+
+    def _posterior_means(self) -> List[float]:
+        """
+        Closed form from bayesian-testing:
+
+        P(non-zero) x exp(m_post + b_post / (2 * a_post)).
+
+        The variance is a plug-in point estimate. Averaging the draws instead is
+        unstable with few non-zero values, since E[exp(sigma^2 / 2)] is infinite
+        when sigma^2 is Inverse-Gamma.
+        """
+        means = []
+        rows = zip(
+            self.totals,
+            self.positives,
+            self.sum_logs,
+            self.sum_logs_2,
+            self._values("a_prior_beta"),
+            self._values("b_prior_beta"),
+            self._values("m_prior"),
+            self._values("a_prior_ig"),
+            self._values("b_prior_ig"),
+            self._values("w_prior"),
+        )
+        for total, n, s, s2, a_beta, b_beta, m, a_ig, b_ig, w in rows:
+            if n == 0:
+                means.append(0.0)
+                continue
+            x_bar = s / n
+            a_post = a_ig + n / 2
+            b_post = (
+                b_ig
+                + 0.5 * (s2 - 2 * s * x_bar + n * x_bar**2)
+                + (n * w) / (2 * (n + w)) * (x_bar - m) ** 2
+            )
+            m_post = (s + w * m) / (n + w)
+            p_non_zero = (a_beta + n) / (a_beta + b_beta + total)
+            means.append(
+                round(float(np.exp(m_post + b_post / (2 * a_post)) * p_non_zero), 5)
+            )
+        return means
 
     def add_variant_data_agg(
         self,

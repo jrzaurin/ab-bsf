@@ -1,15 +1,3 @@
-"""
-Turning posterior draws into decision metrics.
-
-Two layers:
-
-* ``sample_*_agg`` functions return the posterior draws of each variant's mean
-  metric, shape (n_variants, sim_count).
-* ``estimate_*`` functions summarise any such array: probability of being best,
-  expected loss, credible intervals, and (ab_bsf additions) relative differences
-  vs a reference variant with their credible intervals.
-"""
-
 from typing import List, Optional
 
 import numpy as np
