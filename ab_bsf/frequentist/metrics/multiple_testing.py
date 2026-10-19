@@ -14,9 +14,9 @@ def adjust_p_values(
     alpha: float = 0.05,
 ) -> Dict[str, Dict[str, float]]:
     """
-    Add ``<p_value_key>_adjusted`` and ``reject`` to every comparison in a results
-    dict (e.g. from ``t_test``). Use "holm" to control the family-wise error rate
-    across treatment arms, "fdr_bh" for exploratory KPIs.
+    Add ``<p_value_key>_adjusted`` and ``reject`` to every comparison in a
+    results dict (e.g. from ``t_test``). Use "holm" to control the family-wise
+    error rate across treatment arms, "fdr_bh" for exploratory KPIs.
     """
     keys = list(results)
     reject, adj, _, _ = multipletests(

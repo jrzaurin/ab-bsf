@@ -1,17 +1,4 @@
-"""
-Regression-based evaluation with time-period effects (fixed vs mixed).
-
-* Fixed effects: one dummy per time bucket, removes every bucket-specific shock.
-  Best with few buckets that each have plenty of data (e.g. day-of-week).
-* Mixed effects: bucket intercepts ~ N(0, s^2), partial pooling. Best with many
-  buckets of uneven size. Assumes normal bucket effects; extreme buckets shrink.
-
-Input is long data with one row per observation (or per user x bucket, see
-``prepare_data_for_analysis``). Use ``summarise_treatment_effects`` to pull the
-per-group effects out of any result.
-"""
-
-from typing import Dict, Literal, Optional
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -49,10 +36,28 @@ def fixed_effects_linear_regression(
     cluster_col: Optional[str] = None,
 ):
     """
+    Fixed effects: one dummy per time bucket, removes every bucket-specific
+    shock. Best with few buckets that each have plenty of data (e.g.
+    day-of-week).
+
     OLS ``metric ~ group + C(time)``.
 
     ``cluster_col`` (e.g. the time bucket or user id) gives cluster-robust SEs;
-    otherwise HC1 robust SEs. Returns a statsmodels results object.
+    otherwise HC1 robust SEs. Returns a statsmodels results object, which
+    ``summarise_treatment_effects`` turns into one row per treatment group.
+
+    Examples
+    --------
+    On a 0/1 outcome the estimate is the absolute lift in conversion rate:
+
+    >>> from ab_bsf.datasets import make_conversion_data
+    >>> df = make_conversion_data(n_days=14, users_per_day=2000, seed=6)
+    >>> result = fixed_effects_linear_regression(
+    ...     df, temporal_col="day", metric_col="conversion"
+    ... )
+    >>> effect = summarise_treatment_effects(result)["treatment"]
+    >>> round(effect["estimate"], 3), round(effect["p_value"], 3)
+    (0.008, 0.007)
     """
     ref = _reference(df, group_col, reference_group)
     formula = f"{metric_col} ~ {_group_term(group_col, ref)} + C({temporal_col})"
@@ -70,16 +75,34 @@ def mixed_effects_linear_regression(
     reference_group: Optional[str] = None,
 ):
     """
-    Linear mixed model ``metric ~ group + (1 | time)`` (REML).
+    Mixed effects: bucket intercepts ~ N(0, s^2), partial pooling. Best with
+    many buckets of uneven size. Assumes normal bucket effects; extreme buckets
+    shrink.
+
+    Linear mixed model ``metric ~ group + (1 | time)`` (Residual Maximum Likelihood).
 
     Also usable for 0/1 outcomes as a linear probability model, which with large
     samples gives reliable effects on the percentage-point scale.
+
+    Examples
+    --------
+    >>> from ab_bsf.datasets import make_conversion_data
+    >>> df = make_conversion_data(n_days=14, users_per_day=2000, seed=6)
+    >>> result = mixed_effects_linear_regression(
+    ...     df, temporal_col="day", metric_col="conversion"
+    ... )
+    >>> effect = summarise_treatment_effects(result)["treatment"]
+    >>> round(effect["estimate"], 3), round(effect["p_value"], 3)
+    (0.008, 0.007)
     """
     ref = _reference(df, group_col, reference_group)
     model = smf.mixedlm(
         f"{metric_col} ~ {_group_term(group_col, ref)}", df, groups=df[temporal_col]
     )
-    return model.fit(reml=True)
+    # The default optimizer chain (bfgs, then lbfgs restarted from bfgs's failed
+    # endpoint) can stall at a wrong, inflated bucket variance and still report
+    # convergence. lbfgs from the default start finds the right optimum.
+    return model.fit(reml=True, method="lbfgs")
 
 
 def fixed_effects_logistic_regression(
@@ -95,6 +118,15 @@ def fixed_effects_logistic_regression(
     (time x group) counts: identical estimates to the per-row fit, much faster.
     SEs are clustered by time bucket unless ``cluster_by_time=False``.
     Coefficients are log odds ratios.
+
+    Examples
+    --------
+    >>> from ab_bsf.datasets import make_conversion_data
+    >>> df = make_conversion_data(n_days=14, users_per_day=2000, seed=6)
+    >>> result = fixed_effects_logistic_regression(df, temporal_col="day")
+    >>> effect = summarise_treatment_effects(result)["treatment"]
+    >>> round(effect["estimate"], 3), round(effect["odds_ratio"], 3)
+    (0.07, 1.072)
     """
     ref = _reference(df, group_col, reference_group)
     agg = (
@@ -125,6 +157,15 @@ def mixed_effects_logistic_regression(
     means/SDs (``fe_mean``, ``fe_sd``), not p-values, and VB tends to understate
     uncertainty. For a frequentist GLMM use lme4 (R) or pymer4; for p-values in
     Python, use ``mixed_effects_linear_regression`` on the 0/1 outcome.
+
+    Examples
+    --------
+    >>> from ab_bsf.datasets import make_conversion_data
+    >>> df = make_conversion_data(n_days=14, users_per_day=2000, seed=6)
+    >>> result = mixed_effects_logistic_regression(df, temporal_col="day")
+    >>> effect = summarise_treatment_effects(result)["treatment"]
+    >>> round(effect["odds_ratio"], 2), round(effect["prob_positive"], 2)
+    (1.07, 1.0)
     """
     from statsmodels.genmod.bayes_mixed_glm import BinomialBayesMixedGLM
 
