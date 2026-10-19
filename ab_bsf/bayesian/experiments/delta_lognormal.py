@@ -232,5 +232,4 @@ class DeltaLognormalBayesianTest(BaseBayesianTest):
         )
 
 
-# Spelling used in some of the original scripts
 DeltaLogNormalBayesianTest = DeltaLognormalBayesianTest
