@@ -2,7 +2,6 @@ from .base import BaseBayesianTest
 from .binary import BinaryBayesianTest
 from .delta_lognormal import DeltaLognormalBayesianTest, DeltaLogNormalBayesianTest
 from .delta_normal import DeltaNormalBayesianTest
-from .did import BaseDidTest, BinaryDidTest
 from .discrete import DiscreteBayesianTest
 from .exponential import ExponentialBayesianTest
 from .normal import NormalBayesianTest
@@ -18,6 +17,4 @@ __all__ = [
     "ExponentialBayesianTest",
     "PoissonBayesianTest",
     "DiscreteBayesianTest",
-    "BaseDidTest",
-    "BinaryDidTest",
 ]

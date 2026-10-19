@@ -17,7 +17,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "black", "isort", "flake8", "mypy"]
+dev = [
+    "pytest>=7",
+    "black",
+    "isort",
+    "flake8",
+    "mypy",
+    # needed by the Cursor/VS Code mypy extension when it runs from the project venv
+    "vscode-common-python-lsp",
+]
 
 [tool.setuptools.packages.find]
 include = ["ab_bsf*"]
@@ -26,12 +34,8 @@ include = ["ab_bsf*"]
 testpaths = ["tests", "ab_bsf"]
 addopts = "--doctest-modules"
 
-[tool.black]
-line-length = 127
-
 [tool.isort]
 profile = "black"
-line_length = 127
 skip = [".venv"]
 
 [tool.mypy]

@@ -3,7 +3,11 @@ from typing import Optional, Tuple
 import numpy as np
 from scipy.stats import norm
 
-from ab_bsf.frequentist.experiments.base import BaseFrequentistTest, Distribution, TestType
+from ab_bsf.frequentist.experiments.base import (
+    BaseFrequentistTest,
+    Distribution,
+    TestType,
+)
 from ab_bsf.utils.utils import alias_params
 
 
@@ -41,7 +45,9 @@ class ContinuousFrequentistTest(BaseFrequentistTest):
         test_type: TestType = "one_tail",
         **kwargs,
     ):
-        super().__init__(n1, p1, alpha, power, n2, ratio, distribution, test_type, **kwargs)
+        super().__init__(
+            n1, p1, alpha, power, n2, ratio, distribution, test_type, **kwargs
+        )
         if "std1" not in self.additional_params:
             raise ValueError("std1 must be provided in kwargs")
         self.std1 = float(self.additional_params["std1"])
@@ -53,7 +59,9 @@ class ContinuousFrequentistTest(BaseFrequentistTest):
         return float(np.sqrt(self.std1**2 / n_c + self.std2**2 / n_t))
 
     @alias_params(control_sample_size="total_control_sample_size")
-    def minimum_detectable_effect(self, control_sample_size: Optional[int] = None) -> Tuple[float, float]:
+    def minimum_detectable_effect(
+        self, control_sample_size: Optional[int] = None
+    ) -> Tuple[float, float]:
         """(relative MDE, mean2_min)."""
         n_c, n_t = self._overwrite_sample_size(control_sample_size)
         min_diff = (self._z_alpha(n_c, n_t) + norm.ppf(self.power)) * self._se(n_c, n_t)
@@ -61,9 +69,13 @@ class ContinuousFrequentistTest(BaseFrequentistTest):
         return float(mde), float(self.p1 + min_diff)
 
     @alias_params(p2="mean2", control_sample_size="total_control_sample_size")
-    def power_given_sample_size(self, p2: float, control_sample_size: Optional[int] = None) -> float:
+    def power_given_sample_size(
+        self, p2: float, control_sample_size: Optional[int] = None
+    ) -> float:
         n_c, n_t = self._overwrite_sample_size(control_sample_size)
-        return self._power_from_z((p2 - self.p1) / self._se(n_c, n_t), self._z_alpha(n_c, n_t))
+        return self._power_from_z(
+            (p2 - self.p1) / self._se(n_c, n_t), self._z_alpha(n_c, n_t)
+        )
 
     @alias_params(p2="mean2")
     def sample_size_given_power(self, p2: float) -> Tuple[int, int]:
@@ -72,5 +84,7 @@ class ContinuousFrequentistTest(BaseFrequentistTest):
         if delta == 0:
             raise ValueError("p2 equals p1 (zero effect)")
         z = self._z_alpha() + norm.ppf(self.power)
-        n_control = int(np.ceil(z**2 * (self.std1**2 + self.std2**2 / self.ratio) / delta**2))
+        n_control = int(
+            np.ceil(z**2 * (self.std1**2 + self.std2**2 / self.ratio) / delta**2)
+        )
         return n_control, int(np.ceil(n_control * self.ratio))

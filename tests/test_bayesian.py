@@ -4,7 +4,6 @@ from scipy import integrate, stats
 
 from ab_bsf.bayesian.experiments import (
     BinaryBayesianTest,
-    BinaryDidTest,
     DeltaLognormalBayesianTest,
     DeltaNormalBayesianTest,
     DiscreteBayesianTest,
@@ -12,7 +11,6 @@ from ab_bsf.bayesian.experiments import (
     NormalBayesianTest,
     PoissonBayesianTest,
 )
-from ab_bsf.bayesian.metrics import eval_bernoulli_agg
 
 
 def prob_b_beats_a(a1, b1, a2, b2):
@@ -55,7 +53,9 @@ def test_binary_credible_interval_matches_exact_beta_quantiles():
     for i, x in enumerate(rng.binomial(800, 0.08, 20)):
         t = BinaryBayesianTest()
         t.add_variant_data_agg("A", 800, int(x))
-        lo, hi = t.evaluate(sim_count=200_000, seed=i, return_samples=False)[0]["credible_interval"]
+        lo, hi = t.evaluate(sim_count=200_000, seed=i, return_samples=False)[0][
+            "credible_interval"
+        ]
         exact = stats.beta.ppf([0.025, 0.975], x + 0.5, 800 - x + 0.5)
         assert (lo, hi) == pytest.approx(tuple(exact), abs=1e-3)
 
@@ -70,34 +70,6 @@ def test_relative_difference_and_reference():
     r_b = t.evaluate(seed=0, reference="B")
     assert r_b[0]["relative_difference"] == pytest.approx(-0.09, abs=0.01)
     assert len(r[1]["posterior_samples"]) == 20000
-
-
-def test_evaluate_with_did_and_binary_did_test():
-    t = BinaryBayesianTest()
-    t.add_variant_data_agg("control", 20_000, 2200)  # 11% (pre 10%)
-    t.add_variant_data_agg("treatment", 20_000, 3400)  # 17% (pre 12%)
-    r = t.evaluate_with_did({"control": 0.10, "treatment": 0.12}, seed=1)
-    assert r[1]["did"] == pytest.approx(0.04, abs=0.005)
-    assert r[1]["prob_did_positive"] > 0.99
-
-    d = BinaryDidTest()
-    d.add_group_data("treatment", "pre", 20_000, 2400)
-    d.add_group_data("treatment", "post", 20_000, 3400)
-    d.add_group_data("control", "pre", 20_000, 2000)
-    d.add_group_data("control", "post", 20_000, 2200)
-    out = d.evaluate("treatment", "control", seed=1)
-    assert out["did"] == pytest.approx(0.04, abs=0.005)
-    # four noisy cells -> wider than the known-pre-rate version
-    w_four = out["credible_interval"][1] - out["credible_interval"][0]
-    w_two = r[1]["did_credible_interval"][1] - r[1]["did_credible_interval"][0]
-    assert w_four > w_two
-    with pytest.raises(ValueError):
-        d.evaluate("treatment", "missing")
-
-
-def test_eval_wrapper_signature():
-    pbbs, loss, ci = eval_bernoulli_agg([100, 100], [10, 20], seed=1)
-    assert len(pbbs) == len(loss) == len(ci) == 2 and sum(pbbs) == pytest.approx(1)
 
 
 # --------------------------------------------------------------------- normal
@@ -115,18 +87,6 @@ def test_normal_close_to_t_interval_with_vague_prior():
     assert r["credible_interval"][1] == pytest.approx(hi, abs=0.1)
 
 
-def test_normal_did_recovers_effect():
-    rng = np.random.default_rng(1)
-    t = NormalBayesianTest()
-    pre_c = rng.normal(50, 10, 2000)
-    pre_t = rng.normal(52, 10, 2000)
-    t.add_variant_data_did("control", pre_c + 5 + rng.normal(0, 3, 2000), pre_c)
-    t.add_variant_data_did("treatment", pre_t + 8 + rng.normal(0, 3, 2000), pre_t)
-    r = t.evaluate(seed=1)
-    assert r[1]["posterior_mean"] - r[0]["posterior_mean"] == pytest.approx(3, abs=0.3)
-    assert r[1]["prob_being_best"] > 0.999
-
-
 # ------------------------------------------------------- other conjugate tests
 def test_exponential_posterior_mean_closed_form():
     rng = np.random.default_rng(2)
@@ -135,7 +95,9 @@ def test_exponential_posterior_mean_closed_form():
     t.add_variant_data("B", rng.exponential(25, 3000))
     r = t.evaluate(seed=1, min_is_best=True)
     for row in r:
-        assert row["posterior_mean"] == pytest.approx(np.mean(row["posterior_samples"]), rel=0.01)
+        assert row["posterior_mean"] == pytest.approx(
+            np.mean(row["posterior_samples"]), rel=0.01
+        )
     assert r[1]["prob_being_best"] > 0.99
 
 
@@ -157,8 +119,12 @@ def test_delta_lognormal_mean_and_min_positive():
 def test_delta_normal_poisson_discrete_run():
     rng = np.random.default_rng(5)
     dn = DeltaNormalBayesianTest()
-    dn.add_variant_data("A", np.where(rng.random(3000) < 0.2, rng.normal(5, 20, 3000), 0))
-    dn.add_variant_data("B", np.where(rng.random(3000) < 0.2, rng.normal(9, 20, 3000), 0))
+    dn.add_variant_data(
+        "A", np.where(rng.random(3000) < 0.2, rng.normal(5, 20, 3000), 0)
+    )
+    dn.add_variant_data(
+        "B", np.where(rng.random(3000) < 0.2, rng.normal(9, 20, 3000), 0)
+    )
     assert dn.evaluate(seed=1)[1]["prob_being_best"] > 0.8
 
     po = PoissonBayesianTest()

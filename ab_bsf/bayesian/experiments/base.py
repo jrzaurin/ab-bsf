@@ -1,8 +1,13 @@
-"""Base class for the conjugate Bayesian A/B tests."""
+"""
+The code in this module is based on the code in the following repository:
+https://github.com/Matt52/bayesian-testing
+
+Therefore, all credits to the original author.
+"""
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -20,103 +25,50 @@ class BaseBayesianTest(ABC):
     Base class for Bayesian A/B(/C...) tests.
 
     Each variant is stored in ``self.data[name]`` as a dict of aggregated
-    sufficient statistics plus its prior parameters. Subclasses declare which
-    keys are aggregates (summed when appending with ``replace=False``) and
-    implement ``_posterior_samples`` and ``_observed_columns``.
+    sufficient statistics plus its prior parameters. When appending with
+    ``replace=False`` the aggregates are summed and the original priors are
+    kept. Subclasses implement ``_posterior_samples``, ``_posterior_means`` and
+    ``_observed_columns``.
 
     The first variant added is the reference for relative differences unless
     ``reference`` is passed to ``evaluate``.
     """
 
-    #: names of the aggregated statistics stored per variant
-    _aggregate_keys: Tuple[str, ...] = ()
-
     def __init__(self) -> None:
         self.data: Dict[str, Dict[str, Any]] = {}
 
-    # ------------------------------------------------------------------ data
     @property
     def variant_names(self) -> List[str]:
         return list(self.data)
 
-    def _values(self, key: str) -> List[Any]:
-        return [self.data[k][key] for k in self.data]
-
-    def _store(self, name: str, aggregates: Dict[str, Any], priors: Dict[str, Any], replace: bool) -> None:
-        if not isinstance(name, str):
-            raise ValueError("Variant name has to be a string.")
-        if name not in self.data:
-            self.data[name] = {**aggregates, **priors}
-        elif replace:
-            warnings.warn(
-                f"Variant {name} already exists - new data is replacing it. "
-                "If you wish to append instead, use replace=False."
-            )
-            self.data[name] = {**aggregates, **priors}
-        else:
-            warnings.warn(
-                f"Variant {name} already exists - new data is appended to variant, "
-                "keeping its original prior setup. If you wish to replace data instead, use replace=True."
-            )
-            for key, value in aggregates.items():
-                self.data[name][key] += value
-
-    def delete_variant(self, name: str) -> None:
-        """Delete a variant and all its data."""
-        if not isinstance(name, str):
-            raise ValueError("Variant name has to be a string.")
-        if name not in self.data:
-            warnings.warn(f"Nothing to be deleted. Variant {name} is not in experiment.")
-        else:
-            del self.data[name]
-
-    # ------------------------------------------------------------ to override
-    @abstractmethod
-    def _posterior_samples(self, sim_count: int, seed: Optional[int]) -> np.ndarray:
-        """Posterior draws of each variant's mean metric, shape (n_variants, sim_count)."""
-
-    @abstractmethod
-    def _observed_columns(self) -> Dict[str, List[Any]]:
-        """Observed (data) columns reported by ``evaluate``, in display order."""
-
-    def _posterior_means(self, samples: np.ndarray) -> List[float]:
-        """Posterior mean of the metric. Override with closed forms where available."""
-        return [float(x) for x in np.round(samples.mean(axis=1), 5)]
-
-    # -------------------------------------------------------------- evaluation
-    def _reference_idx(self, reference: Optional[str]) -> int:
-        if reference is None:
-            return 0
-        if reference not in self.data:
-            raise ValueError(f"Reference variant '{reference}' is not in the experiment.")
-        return self.variant_names.index(reference)
-
-    def eval_simulation(
+    def probabs_of_being_best(
         self,
         sim_count: int = 20000,
         seed: Optional[int] = None,
         min_is_best: bool = False,
+    ) -> Dict[str, float]:
+        """Probability of each variant being best."""
+        return self._by_variant(estimate_probabilities, sim_count, seed, min_is_best)
+
+    def expected_loss(
+        self,
+        sim_count: int = 20000,
+        seed: Optional[int] = None,
+        min_is_best: bool = False,
+    ) -> Dict[str, float]:
+        """Expected loss of choosing each variant."""
+        return self._by_variant(estimate_expected_loss, sim_count, seed, min_is_best)
+
+    def credible_intervals(
+        self,
+        sim_count: int = 20000,
+        seed: Optional[int] = None,
         interval_alpha: float = 0.95,
-    ) -> Tuple[dict, dict, dict]:
-        """Probabilities of being best, expected loss and credible intervals (dicts by variant)."""
-        if not self.data:
-            return {}, {}, {}
-        samples = self._posterior_samples(sim_count, seed)
-        names = self.variant_names
-        return (
-            dict(zip(names, estimate_probabilities(samples, min_is_best))),
-            dict(zip(names, estimate_expected_loss(samples, min_is_best))),
-            dict(zip(names, estimate_credible_intervals(samples, interval_alpha))),
+    ) -> Dict[str, List[float]]:
+        """Credible interval of each variant's metric."""
+        return self._by_variant(
+            estimate_credible_intervals, sim_count, seed, interval_alpha
         )
-
-    def probabs_of_being_best(self, sim_count=20000, seed=None, min_is_best=False, interval_alpha=0.95) -> dict:
-        return self.eval_simulation(sim_count, seed, min_is_best, interval_alpha)[0]
-
-    def expected_loss(self, sim_count=20000, seed=None, min_is_best=False, interval_alpha=0.95) -> dict:
-        return self.eval_simulation(sim_count, seed, min_is_best, interval_alpha)[1]
-
-    def credible_intervals(self, sim_count=20000, seed=None, min_is_best=False, interval_alpha=0.95) -> dict:
-        return self.eval_simulation(sim_count, seed, min_is_best, interval_alpha)[2]
 
     def evaluate(
         self,
@@ -152,10 +104,14 @@ class BaseBayesianTest(ABC):
 
         columns: Dict[str, List[Any]] = {"variant": self.variant_names}
         columns.update(self._observed_columns())
-        columns["posterior_mean"] = self._posterior_means(samples)
-        columns["credible_interval"] = estimate_credible_intervals(samples, interval_alpha)
+        columns["posterior_mean"] = self._posterior_means()
+        columns["credible_interval"] = estimate_credible_intervals(
+            samples, interval_alpha
+        )
         columns["relative_difference"] = estimate_relative_differences(samples, ref)
-        columns["relative_credible_interval"] = estimate_relative_credible_intervals(samples, ref, interval_alpha)
+        columns["relative_credible_interval"] = estimate_relative_credible_intervals(
+            samples, ref, interval_alpha
+        )
         columns["prob_being_best"] = estimate_probabilities(samples, min_is_best)
         columns["expected_loss"] = estimate_expected_loss(samples, min_is_best)
         if return_samples:
@@ -163,3 +119,69 @@ class BaseBayesianTest(ABC):
 
         keys = list(columns)
         return [dict(zip(keys, row)) for row in zip(*columns.values())]
+
+    def delete_variant(self, name: str) -> None:
+        """Delete a variant and all its data."""
+        if not isinstance(name, str):
+            raise ValueError("Variant name has to be a string.")
+        if name not in self.data:
+            warnings.warn(
+                f"Nothing to be deleted. Variant {name} is not in experiment."
+            )
+        else:
+            del self.data[name]
+
+    def _store(
+        self,
+        name: str,
+        aggregates: Dict[str, Any],
+        priors: Dict[str, Any],
+        replace: bool,
+    ) -> None:
+        if not isinstance(name, str):
+            raise ValueError("Variant name has to be a string.")
+        if name not in self.data:
+            self.data[name] = {**aggregates, **priors}
+        elif replace:
+            warnings.warn(
+                f"Variant {name} already exists - new data is replacing it. "
+                "If you wish to append instead, use replace=False."
+            )
+            self.data[name] = {**aggregates, **priors}
+        else:
+            warnings.warn(
+                f"Variant {name} already exists - new data is appended to variant, "
+                "keeping its original prior setup. If you wish to replace data instead, use replace=True."
+            )
+            for key, value in aggregates.items():
+                self.data[name][key] += value
+
+    def _values(self, key: str) -> List[Any]:
+        return [self.data[k][key] for k in self.data]
+
+    def _by_variant(self, estimate, sim_count: int, seed: Optional[int], *args) -> dict:
+        if not self.data:
+            return {}
+        samples = self._posterior_samples(sim_count, seed)
+        return dict(zip(self.variant_names, estimate(samples, *args)))
+
+    def _reference_idx(self, reference: Optional[str]) -> int:
+        if reference is None:
+            return 0
+        if reference not in self.data:
+            raise ValueError(
+                f"Reference variant '{reference}' is not in the experiment."
+            )
+        return self.variant_names.index(reference)
+
+    @abstractmethod
+    def _posterior_samples(self, sim_count: int, seed: Optional[int]) -> np.ndarray:
+        """Posterior draws of each variant's mean metric, shape (n_variants, sim_count)."""
+
+    @abstractmethod
+    def _observed_columns(self) -> Dict[str, List[Any]]:
+        """Observed (data) columns reported by ``evaluate``, in display order."""
+
+    @abstractmethod
+    def _posterior_means(self) -> List[float]:
+        """Posterior mean of the metric, in closed form from the conjugate update."""

@@ -38,13 +38,19 @@ def winsorize(
         lo, hi = s.quantile([lower_percentile, upper_percentile])
         return s.clip(lo, hi)
     if winsorization_method == "group":
-        lo = df.groupby(group_col)[target_col].transform(lambda x: x.quantile(lower_percentile))
-        hi = df.groupby(group_col)[target_col].transform(lambda x: x.quantile(upper_percentile))
+        lo = df.groupby(group_col)[target_col].transform(
+            lambda x: x.quantile(lower_percentile)
+        )
+        hi = df.groupby(group_col)[target_col].transform(
+            lambda x: x.quantile(upper_percentile)
+        )
         return s.clip(lo, hi)
     raise ValueError("winsorization_method must be 'pooled' or 'group'")
 
 
-def cuped_adjustment(df: pd.DataFrame, target_col: str, covariate_col: str) -> pd.Series:
+def cuped_adjustment(
+    df: pd.DataFrame, target_col: str, covariate_col: str
+) -> pd.Series:
     """
     CUPED variance reduction: Y_adj = Y - theta (X - mean(X)), theta = Cov(Y, X) / Var(X).
 
@@ -57,7 +63,9 @@ def cuped_adjustment(df: pd.DataFrame, target_col: str, covariate_col: str) -> p
     if var_x == 0:
         raise ValueError(f"Covariate '{covariate_col}' has zero variance")
     theta = np.cov(y, x, ddof=1)[0, 1] / var_x
-    return pd.Series(y - theta * (x - x.mean()), index=df.index, name=f"{target_col}_cuped")
+    return pd.Series(
+        y - theta * (x - x.mean()), index=df.index, name=f"{target_col}_cuped"
+    )
 
 
 def prepare_data_for_analysis(
@@ -81,4 +89,8 @@ def prepare_data_for_analysis(
     seconds = (ts - ts.min()).dt.total_seconds()
     divisor = {"s": 1, "m": 60, "h": 3600, "d": 86400}[unit_time_col]
     out["time_int"] = (seconds // divisor).astype(int)
-    return out.groupby([user_id_col, "time_int", group_col], observed=True).agg({metric_col: aggregation_method}).reset_index()
+    return (
+        out.groupby([user_id_col, "time_int", group_col], observed=True)
+        .agg({metric_col: aggregation_method})
+        .reset_index()
+    )
