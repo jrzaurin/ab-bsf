@@ -11,6 +11,11 @@ from ab_bsf.bayesian.experiments import (
     NormalBayesianTest,
     PoissonBayesianTest,
 )
+from ab_bsf.bayesian.models import (
+    DeltaLognormal,
+    DirichletMultinomial,
+    NormalInverseGamma,
+)
 
 
 def prob_b_beats_a(a1, b1, a2, b2):
@@ -76,8 +81,8 @@ def test_relative_difference_and_reference():
 def test_normal_close_to_t_interval_with_vague_prior():
     rng = np.random.default_rng(3)
     x = rng.normal(50, 10, 400)
-    t = NormalBayesianTest()
-    t.add_variant_data("A", x, w_prior=0.0001)
+    t = NormalBayesianTest(NormalInverseGamma(w_prior=0.0001))
+    t.add_variant_data("A", x)
     t.add_variant_data("B", x + 1)
     r = t.evaluate(sim_count=200_000, seed=1)[0]
     se = x.std(ddof=1) / np.sqrt(len(x))
@@ -112,7 +117,8 @@ def test_delta_lognormal_mean_and_min_positive():
     true_mean = 0.3 * np.exp(3 + 0.5)
     assert r["posterior_mean"] == pytest.approx(true_mean, rel=0.05)
     dust = np.concatenate([x, np.full(500, 1e-8)])
-    t.add_variant_data("A", dust, min_positive=1e-6)
+    t = DeltaLognormalBayesianTest(DeltaLognormal(min_positive=1e-6))
+    t.add_variant_data("A", dust)
     assert t.data["A"]["positives"] == int((x > 0).sum())
 
 
@@ -133,7 +139,69 @@ def test_delta_normal_poisson_discrete_run():
     r = po.evaluate(seed=1)
     assert r[1]["posterior_mean"] == pytest.approx(2.3, abs=0.1)
 
-    ds = DiscreteBayesianTest([1, 2, 3, 4, 5])
+    ds = DiscreteBayesianTest(DirichletMultinomial([1, 2, 3, 4, 5]))
     ds.add_variant_data("A", [1, 2, 3, 3, 4])
     ds.add_variant_data_agg("A", [0, 0, 0, 0, 5], replace=False)
-    assert ds.data["A"]["concentration"] == [1, 1, 2, 1, 5]
+    assert ds.data["A"]["concentration"].tolist() == [1, 1, 2, 1, 5]
+
+
+# --------------------------------------------------------------------- priors
+def test_binary_fit_priors_and_prior_fraction():
+    history = np.random.default_rng(0).binomial(1, 0.3, 5000)
+    positives = history.sum()
+    test = BinaryBayesianTest().fit_priors(history)
+    prior = {"a_prior": positives + 0.5, "b_prior": 5000 - positives + 0.5}
+    assert test.model.prior == prior
+
+    test.add_variant_data_agg("control", 1000, 100)
+    test.add_variant_data_agg("treatment", 1500, 150)
+    row = test.evaluate(seed=0, prior_fraction=0.2)[0]
+    # the prior keeps its mean and is worth 20% of the average variant (1250)
+    prior_mean = prior["a_prior"] / (prior["a_prior"] + prior["b_prior"])
+    assert row["posterior_mean"] == pytest.approx(
+        (250 * prior_mean + 100) / (250 + 1000), abs=1e-5
+    )
+    assert test.model.prior == prior  # weighting does not change the stored prior
+
+
+def _draws(rng, n, scale):
+    """Data of each likelihood; ``scale`` 1 is the history, 2 the experiment."""
+    zero_inflated = rng.random(n) < 0.3
+    return {
+        "poisson": rng.poisson(2.5 * scale, n),
+        "exponential": rng.exponential(30 * scale, n),
+        "normal": rng.normal(10 * scale, 3, n),
+        "delta_normal": np.where(zero_inflated, rng.normal(50 * scale, 10, n), 0),
+        "delta_lognormal": np.where(
+            zero_inflated, rng.lognormal(3 + scale - 1, 0.8, n), 0
+        ),
+        "discrete": rng.integers(1 + 2 * (scale - 1), 6, n),
+    }
+
+
+EXPERIMENTS = {
+    "poisson": PoissonBayesianTest,
+    "exponential": ExponentialBayesianTest,
+    "normal": NormalBayesianTest,
+    "delta_normal": DeltaNormalBayesianTest,
+    "delta_lognormal": DeltaLognormalBayesianTest,
+    "discrete": lambda: DiscreteBayesianTest(DirichletMultinomial([1, 2, 3, 4, 5])),
+}
+
+
+@pytest.mark.parametrize("likelihood", list(EXPERIMENTS))
+def test_fit_priors_dominate_data_when_weighted_heavily(likelihood):
+    rng = np.random.default_rng(0)
+    history = _draws(rng, 5000, scale=1)[likelihood]
+    data = _draws(rng, 1000, scale=2)[likelihood]
+    test = EXPERIMENTS[likelihood]().fit_priors(history)
+    test.add_variant_data("control", data)
+    test.add_variant_data("treatment", data)
+
+    # the posterior follows the data with a negligible prior, the history with a huge one
+    def posterior_mean(prior_fraction):
+        row = test.evaluate(seed=0, prior_fraction=prior_fraction, return_samples=False)
+        return row[0]["posterior_mean"]
+
+    assert posterior_mean(1e-6) == pytest.approx(np.mean(data), rel=0.15)
+    assert posterior_mean(1e6) == pytest.approx(np.mean(history), rel=0.1)

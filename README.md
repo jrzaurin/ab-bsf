@@ -33,9 +33,30 @@ test.evaluate(seed=1)    # one dict per variant: posterior_mean, credible_interv
                          # relative_difference, prob_being_best, expected_loss, ...
 ```
 
-The other experiment classes follow the same interface: `NormalBayesianTest`,
+Each experiment class pairs a likelihood with its conjugate model (in
+`ab_bsf.bayesian.models`), shared by all variants: `NormalBayesianTest`,
 `PoissonBayesianTest`, `ExponentialBayesianTest`, `DeltaNormalBayesianTest`,
-`DeltaLognormalBayesianTest` and `DiscreteBayesianTest`.
+`DeltaLognormalBayesianTest` and `DiscreteBayesianTest`. The prior is
+uninformative unless you pass a model with your own, e.g.
+`BinaryBayesianTest(BetaBernoulli(a_prior=2, b_prior=8))`.
+
+### Priors from historical data
+
+To use historical data as the prior, fit it with `fit_priors`. At analysis time,
+`prior_fraction` sets how much it weighs: `0.2` makes the prior worth 20% of the
+observations of the average variant.
+
+```python
+from ab_bsf.bayesian.experiments import DeltaLognormalBayesianTest
+
+test = DeltaLognormalBayesianTest().fit_priors(historical_revenue)
+test.add_variant_data("control", control_revenue)
+test.add_variant_data("treatment", treatment_revenue)
+test.evaluate(seed=1, prior_fraction=0.2)
+```
+
+The fitted prior is in `test.model.prior`, and `evaluate` leaves it unchanged, so
+you can re-evaluate with other fractions.
 
 ### Frequentist design
 
@@ -79,9 +100,11 @@ uv run ./code_style.sh   # isort, black, flake8, mypy
 
 ## Acknowledgements
 
-The Bayesian conjugate models follow
+The Bayesian side is inspired by
 [bayesian-testing](https://github.com/Matt52/bayesian-testing) (MIT, © Matus
-Baniar).
+Baniar), however, ab_bsf has its own structure: one conjugate model per
+likelihood, a prior shared by all variants, and priors fitted from historical
+data.
 
 ## License
 

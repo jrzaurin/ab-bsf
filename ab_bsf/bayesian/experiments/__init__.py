@@ -1,4 +1,4 @@
-from .base import BaseBayesianTest
+from .bayesian_test import BayesianTest
 from .binary import BinaryBayesianTest
 from .delta_lognormal import DeltaLognormalBayesianTest, DeltaLogNormalBayesianTest
 from .delta_normal import DeltaNormalBayesianTest
@@ -8,7 +8,7 @@ from .normal import NormalBayesianTest
 from .poisson import PoissonBayesianTest
 
 __all__ = [
-    "BaseBayesianTest",
+    "BayesianTest",
     "BinaryBayesianTest",
     "NormalBayesianTest",
     "DeltaLognormalBayesianTest",
