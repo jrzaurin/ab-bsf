@@ -9,28 +9,28 @@ WEAK = 1
 
 class DirichletMultinomial(ConjugateModel):
     """
-    Dirichlet-Multinomial conjugate model for numeric categorical outcomes (dice,
-    1-5 star ratings). The compared metric is the expected value.
+    Dirichlet-Multinomial conjugate model for numeric categorical outcomes
+    (dice, 1-5 star ratings). The compared metric is the expected value.
 
     This is the multi-category version of ``BetaBernoulli``: the Multinomial
     generalises the Binomial, and the Dirichlet generalises the Beta.
 
     - Likelihood: the count of each category follows a Multinomial(n, p), where
-      ``p`` is the vector of category probabilities. The data enters only through
-      the ``concentration`` (the count per category).
+      ``p`` is the vector of category probabilities. The data enters only
+      through the ``concentration`` (the count per category).
     - Prior: ``p ~ Dirichlet(prior)``, one pseudo-count per category (default 1
       each, i.e. uniform).
     - Posterior: ``p | data ~ Dirichlet(prior + concentration)``, with mean
       probabilities ``(prior_k + count_k) / sum_j (prior_j + count_j)``.
 
     The metric is the expected value of the outcome, ``sum_k category_k x p_k``.
-    Variants are compared by drawing ``p`` from each posterior and converting every
-    draw to its expected value.
+    Variants are compared by drawing ``p`` from each posterior and converting
+    every draw to its expected value.
 
     Parameters
     ----------
-    categories : the possible numeric outcomes, e.g. [1, 2, 3, 4, 5].
-    prior : one pseudo-count per category (default: 1 each).
+    categories : the possible numeric outcomes, e.g. [1, 2, 3, 4, 5]. prior :
+    one pseudo-count per category (default: 1 each).
     """
 
     def __init__(

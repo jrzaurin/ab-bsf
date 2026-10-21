@@ -1,4 +1,4 @@
-from typing import Any, Dict, Sequence
+from typing import Any, Dict
 
 import numpy as np
 
@@ -50,13 +50,14 @@ class GammaPoisson(_GammaModel):
     Gamma-Poisson conjugate model for counts (trades per session, sessions per
     user). The compared metric is the Poisson rate.
 
-    - Likelihood: each observation is Poisson(rate). The data enters only through
-      ``totals`` (number of observations) and ``sum_values`` (total count).
+    - Likelihood: each observation is Poisson(rate). The data enters only
+      through ``totals`` (number of observations) and ``sum_values`` (total
+      count).
     - Prior: ``rate ~ Gamma(a_prior, b_prior)`` with ``b_prior`` as the rate
-      parameter. Read it as ``a_prior`` events seen over ``b_prior`` observations
-      before the experiment (default 0.1 and 0.1, very weak).
-    - Posterior: ``rate | data ~ Gamma(a_prior + sum_values, b_prior + totals)``,
-      with mean ``(a_prior + sum_values) / (b_prior + totals)``.
+      parameter. Read it as ``a_prior`` events seen over ``b_prior``
+      observations before the experiment (default 0.1 and 0.1, very weak).
+    - Posterior: ``rate | data ~ Gamma(a_prior + sum_values, b_prior +
+      totals)``, with mean ``(a_prior + sum_values) / (b_prior + totals)``.
 
     Note: heavily over-dispersed counts (variance >> mean) make the Poisson
     posterior too narrow; check var/mean before trusting the intervals.
@@ -99,22 +100,23 @@ class GammaPoisson(_GammaModel):
 
 class GammaExponential(_GammaModel):
     """
-    Gamma-Exponential conjugate model for positive durations (session time, time to
-    first trade). The compared metric is the mean duration, ``1 / rate``. Use
+    Gamma-Exponential conjugate model for positive durations (session time, time
+    to first trade). The compared metric is the mean duration, ``1 / rate``. Use
     ``evaluate(min_is_best=True)`` when shorter is better.
 
     - Likelihood: each observation is Exponential(rate). The data enters only
-      through ``totals`` (number of observations) and ``sum_values`` (total time).
+      through ``totals`` (number of observations) and ``sum_values`` (total
+      time).
     - Prior: ``rate ~ Gamma(a_prior, b_prior)`` with ``b_prior`` as the rate
-      parameter. Read it as ``a_prior`` events seen over ``b_prior`` units of time
-      before the experiment (default 0.1 and 0.1, very weak).
-    - Posterior: ``rate | data ~ Gamma(a_prior + totals, b_prior + sum_values)``.
-      The mean duration ``1 / rate`` is then Inverse-Gamma, with mean
-      ``(b_prior + sum_values) / (a_prior + totals - 1)``.
+      parameter. Read it as ``a_prior`` events seen over ``b_prior`` units of
+      time before the experiment (default 0.1 and 0.1, very weak).
+    - Posterior: ``rate | data ~ Gamma(a_prior + totals, b_prior +
+      sum_values)``. The mean duration ``1 / rate`` is then Inverse-Gamma, with
+      mean ``(b_prior + sum_values) / (a_prior + totals - 1)``.
 
-    Conjugacy means the posterior stays in the prior's family, so the update has a
-    closed form. Variants are compared by drawing the rate from each posterior and
-    inverting it.
+    Conjugacy means the posterior stays in the prior's family, so the update has
+    a closed form. Variants are compared by drawing the rate from each posterior
+    and inverting it.
     """
 
     def summarize(self, data: Data) -> Statistics:

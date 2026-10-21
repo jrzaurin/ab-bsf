@@ -11,10 +11,11 @@ class ConjugateModel(ABC):
     """
     A likelihood with its conjugate prior, for one variant.
 
-    A model holds the prior in ``prior`` (a dict, uninformative unless set by the
-    user or ``fit_priors``) and knows how to turn the data of a variant into its
-    sufficient statistics, update the prior with them and sample the posterior. It
-    knows nothing about comparing variants: ``BayesianTest`` does that.
+    A model holds the prior in ``prior`` (a dict, uninformative unless set by
+    the user or ``fit_priors``) and knows how to turn the data of a variant into
+    its sufficient statistics, update the prior with them and sample the
+    posterior. It knows nothing about comparing variants: ``BayesianTest`` does
+    that.
     """
 
     @abstractmethod

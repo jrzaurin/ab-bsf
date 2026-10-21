@@ -10,20 +10,20 @@ from ab_bsf.bayesian.models.normal_inverse_gamma import NormalInverseGamma
 
 class DeltaNormal(ConjugateModel):
     """
-    Model for zero-inflated data whose non-zero values can be positive or negative
-    (P&L, net deposits), made of two conjugate models.
+    Model for zero-inflated data whose non-zero values can be positive or
+    negative (P&L, net deposits), made of two conjugate models.
 
     Each variant's data is split in two parts, modelled independently:
 
     1. Whether an observation is non-zero, with a ``BetaBernoulli`` model:
-       ``non_zeros`` out of ``totals`` is Binomial(totals, p), the prior is
-       ``p ~ Beta(a_prior_beta, b_prior_beta)`` and the posterior is
+       ``non_zeros`` out of ``totals`` is Binomial(totals, p), the prior is ``p
+       ~ Beta(a_prior_beta, b_prior_beta)`` and the posterior is
        ``Beta(a_prior_beta + non_zeros, b_prior_beta + totals - non_zeros)``.
     2. The size of the non-zero values, with a ``NormalInverseGamma`` model:
        they are Normal(mu, sigma^2) with both parameters unknown, the prior is
-       ``sigma^2 ~ InverseGamma(a_prior_ig, b_prior_ig)`` and
-       ``mu | sigma^2 ~ Normal(m_prior, sigma^2 / w_prior)``, where ``w_prior`` is
-       the prior's weight in pseudo-observations. The posterior has the same form.
+       ``sigma^2 ~ InverseGamma(a_prior_ig, b_prior_ig)`` and ``mu | sigma^2 ~
+       Normal(m_prior, sigma^2 / w_prior)``, where ``w_prior`` is the prior's
+       weight in pseudo-observations. The posterior has the same form.
 
     The compared metric is the mean per observation, ``p x mu``. Variants are
     compared by drawing from both posteriors and multiplying the draws. The
@@ -143,28 +143,30 @@ class DeltaNormal(ConjugateModel):
 
 class DeltaLognormal(DeltaNormal):
     """
-    Model for zero-inflated, right-skewed data (revenue or volume per session), made
-    of two conjugate models.
+    Model for zero-inflated, right-skewed data (revenue or volume per session),
+    made of two conjugate models.
 
-    Like ``DeltaNormal``, each variant's data is split in a Beta part (whether an
-    observation is non-zero, with ``positives`` out of ``totals``) and a
+    Like ``DeltaNormal``, each variant's data is split in a Beta part (whether
+    an observation is non-zero, with ``positives`` out of ``totals``) and a
     Normal-Inverse-Gamma part, but the non-zero values are assumed lognormal, so
     the Normal-Inverse-Gamma model applies to their logs: ``mu`` and ``sigma^2``
     are the mean and variance of ``log(value)``, and ``m_prior`` is in log space
     (``m_prior=1`` means a geometric mean of e).
 
     The compared metric is the mean per observation, which combines both parts:
-    ``p x exp(mu + sigma^2 / 2)``, i.e. P(non-zero) x E[value | non-zero]. Variants
-    are compared by drawing from both posteriors and multiplying the draws.
+    ``p x exp(mu + sigma^2 / 2)``, i.e. P(non-zero) x E[value | non-zero].
+    Variants are compared by drawing from both posteriors and multiplying the
+    draws.
 
-    The ``posterior_mean`` is a closed form, ``P(non-zero) x exp(m_post + b_post /
-    (2 * a_post))``, where the variance is a plug-in point estimate. Averaging the
-    draws instead is unstable with few non-zero values, since E[exp(sigma^2 / 2)]
-    is infinite when sigma^2 is Inverse-Gamma.
+    The ``posterior_mean`` is a closed form, ``P(non-zero) x exp(m_post + b_post
+    / (2 * a_post))``, where the variance is a plug-in point estimate. Averaging
+    the draws instead is unstable with few non-zero values, since E[exp(sigma^2
+    / 2)] is infinite when sigma^2 is Inverse-Gamma.
 
     Parameters
     ----------
-    min_positive : values <= min_positive count as zeros, e.g. to drop dust trades
+    min_positive : values <= min_positive count as zeros, e.g. to drop dust
+    trades
         that would otherwise create a second mode in log space.
     """
 

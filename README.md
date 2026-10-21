@@ -100,9 +100,11 @@ uv run ./code_style.sh   # isort, black, flake8, mypy
 
 ## Acknowledgements
 
-The Bayesian conjugate models follow
+The Bayesian side is inspired by
 [bayesian-testing](https://github.com/Matt52/bayesian-testing) (MIT, © Matus
-Baniar).
+Baniar), however, ab_bsf has its own structure: one conjugate model per
+likelihood, a prior shared by all variants, and priors fitted from historical
+data.
 
 ## License
 

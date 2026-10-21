@@ -1,9 +1,10 @@
-from typing import Any, Dict, Sequence
+from typing import Any, Dict
 
 import numpy as np
 
 from ab_bsf.bayesian.models.base import ConjugateModel, Data, Statistics
 
+# uninformative prior
 JEFFREYS = 0.5
 
 
@@ -11,19 +12,13 @@ class BetaBernoulli(ConjugateModel):
     """
     Beta-Binomial conjugate model for binary data (conversions).
 
-    Each variant has an unknown conversion rate ``p``. A Bayesian analysis starts
-    from a prior belief about ``p``, updates it with the observed data through the
-    likelihood, and ends with a posterior: a full distribution over ``p``.
-
-    A prior is *conjugate* to a likelihood when the posterior belongs to the same
-    family as the prior, so the update has a closed form. Here:
-
-    - Likelihood: each observation is a Bernoulli(p) trial, so ``positives`` out of
-      ``totals`` follows a Binomial(totals, p).
+    - Likelihood: each observation is a Bernoulli(p) trial, so ``positives`` out
+      of ``totals`` follows a Binomial(totals, p).
     - Prior: ``p ~ Beta(a_prior, b_prior)``. Read ``a_prior`` and ``b_prior`` as
       pseudo-conversions and pseudo-non-conversions seen before the experiment.
       The default is Beta(0.5, 0.5) (Jeffreys).
-    - Posterior: ``p | data ~ Beta(a_prior + positives, b_prior + totals - positives)``.
+    - Posterior: ``p | data ~ Beta(a_prior + positives, b_prior + totals -
+      positives)``.
     """
 
     def __init__(self, a_prior: float = JEFFREYS, b_prior: float = JEFFREYS) -> None:

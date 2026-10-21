@@ -10,8 +10,6 @@ __all__ = [
     "estimate_relative_credible_intervals",
 ]
 
-_EPS = 1e-12
-
 
 # Summaries of posterior draws
 def estimate_probabilities(data: np.ndarray, min_is_best: bool = False) -> List[float]:
@@ -41,12 +39,6 @@ def estimate_credible_intervals(
     return np.round(np.quantile(np.asarray(data), [lo, hi], axis=1).T, 7).tolist()
 
 
-def _relative_draws(data: np.ndarray, reference_idx: int) -> np.ndarray:
-    ref = data[reference_idx]
-    ref_safe = np.where(np.abs(ref) < _EPS, _EPS, ref)
-    return (data - ref) / np.abs(ref_safe)
-
-
 def estimate_relative_differences(
     data: np.ndarray, reference_idx: int = 0
 ) -> List[float]:
@@ -68,3 +60,11 @@ def estimate_relative_credible_intervals(
     out = estimate_credible_intervals(rel, alpha)
     out[reference_idx] = [0.0, 0.0]
     return out
+
+
+def _relative_draws(
+    data: np.ndarray, reference_idx: int, eps: float = 1e-12
+) -> np.ndarray:
+    ref = data[reference_idx]
+    ref_safe = np.where(np.abs(ref) < eps, eps, ref)
+    return (data - ref) / np.abs(ref_safe)
