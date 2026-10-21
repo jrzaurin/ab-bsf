@@ -4,21 +4,6 @@ from .evaluation import (
     estimate_probabilities,
     estimate_relative_credible_intervals,
     estimate_relative_differences,
-    sample_bernoulli_agg,
-    sample_delta_lognormal_agg,
-    sample_delta_normal_agg,
-    sample_exponential_agg,
-    sample_normal_agg,
-    sample_numerical_dirichlet_agg,
-    sample_poisson_agg,
-)
-from .posteriors import (
-    beta_posteriors_all,
-    dirichlet_posteriors,
-    exp_gamma_posteriors_all,
-    lognormal_posteriors,
-    normal_posteriors,
-    pois_gamma_posteriors_all,
 )
 
 __all__ = [
@@ -27,17 +12,4 @@ __all__ = [
     "estimate_probabilities",
     "estimate_relative_credible_intervals",
     "estimate_relative_differences",
-    "sample_bernoulli_agg",
-    "sample_delta_lognormal_agg",
-    "sample_delta_normal_agg",
-    "sample_exponential_agg",
-    "sample_normal_agg",
-    "sample_numerical_dirichlet_agg",
-    "sample_poisson_agg",
-    "beta_posteriors_all",
-    "dirichlet_posteriors",
-    "exp_gamma_posteriors_all",
-    "lognormal_posteriors",
-    "normal_posteriors",
-    "pois_gamma_posteriors_all",
 ]

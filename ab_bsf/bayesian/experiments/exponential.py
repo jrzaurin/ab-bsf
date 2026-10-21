@@ -1,112 +1,36 @@
-from typing import Any, Dict, List
+from typing import Optional
 
-import numpy as np
-
-from ab_bsf.bayesian.experiments.base import BaseBayesianTest
-from ab_bsf.bayesian.metrics.evaluation import sample_exponential_agg
+from ab_bsf.bayesian.experiments.bayesian_test import BayesianTest
+from ab_bsf.bayesian.models import GammaExponential
 
 
-class ExponentialBayesianTest(BaseBayesianTest):
+class ExponentialBayesianTest(BayesianTest):
     """
     Bayesian A/B test for positive durations (session time, time to first trade),
-    Gamma-Exponential conjugate model. The compared metric is the mean duration,
-    ``1 / rate``. Use ``evaluate(min_is_best=True)`` when shorter is better.
+    with the ``GammaExponential`` conjugate model (see it for the math). The
+    compared metric is the mean duration; use ``evaluate(min_is_best=True)`` when
+    shorter is better.
 
-    - Likelihood: each observation is Exponential(rate). The data enters only
-      through ``totals`` (number of observations) and ``sum_values`` (total time).
-    - Prior: ``rate ~ Gamma(a_prior, b_prior)`` with ``b_prior`` as the rate
-      parameter. Read it as ``a_prior`` events seen over ``b_prior`` units of time
-      before the experiment (default 0.1 and 0.1, very weak).
-    - Posterior: ``rate | data ~ Gamma(a_prior + totals, b_prior + sum_values)``.
-      The mean duration ``1 / rate`` is then Inverse-Gamma, with mean
-      ``(b_prior + sum_values) / (a_prior + totals - 1)``.
-
-    Conjugacy means the posterior stays in the prior's family, so the update has a
-    closed form. The test draws the rate from each variant's posterior, inverts it,
-    and compares variants draw by draw to get the probability of being best, the
-    expected loss and credible intervals reported by ``evaluate``.
+    Parameters
+    ----------
+    model : model with the prior shared by all variants (default: Gamma(0.1, 0.1)
+        on the rate).
     """
 
-    @property
-    def totals(self):
-        return self._values("totals")
-
-    @property
-    def sum_values(self):
-        return self._values("sum_values")
-
-    @property
-    def a_priors(self):
-        return self._values("a_prior")
-
-    @property
-    def b_priors(self):
-        return self._values("b_prior")
-
-    def _posterior_samples(self, sim_count, seed):
-        return sample_exponential_agg(
-            self.totals, self.sum_values, self.a_priors, self.b_priors, sim_count, seed
-        )
-
-    def _observed_columns(self) -> Dict[str, List[Any]]:
-        return {
-            "totals": self.totals,
-            "sum_values": [round(s, 5) for s in self.sum_values],
-            "observed_average": [
-                round(s / t, 5) for s, t in zip(self.sum_values, self.totals)
-            ],
-        }
-
-    def _posterior_means(self):
-        # E[1/lambda] for lambda ~ Gamma(a + n, b + sum) is (b + sum) / (a + n - 1)
-        return [
-            round((b + s) / (a + t - 1), 5)
-            for s, t, a, b in zip(
-                self.sum_values, self.totals, self.a_priors, self.b_priors
-            )
-        ]
+    def __init__(self, model: Optional[GammaExponential] = None) -> None:
+        super().__init__(model or GammaExponential())
 
     def add_variant_data_agg(
-        self,
-        name: str,
-        totals: int,
-        sum_values: float,
-        a_prior: float = 0.1,
-        b_prior: float = 0.1,
-        replace: bool = True,
+        self, name: str, totals: int, sum_values: float, replace: bool = True
     ) -> None:
-        """Add aggregated data. Default prior Gamma(0.1, 0.1) on the rate (vague)."""
-        if a_prior <= 0 or b_prior <= 0:
-            raise ValueError("Both [a_prior, b_prior] have to be positive numbers.")
-        if totals <= 0:
-            raise ValueError(
-                "Input variable 'totals' is expected to be positive integer."
-            )
-        if sum_values < 0:
-            raise ValueError(
-                "Input variable 'sum_values' is expected to be non-negative number."
-            )
-        self._store(
-            name,
-            {"totals": totals, "sum_values": sum_values},
-            {"a_prior": a_prior, "b_prior": b_prior},
-            replace,
-        )
+        """
+        Add aggregated durations.
 
-    def add_variant_data(
-        self,
-        name: str,
-        data: List[float],
-        a_prior: float = 0.1,
-        b_prior: float = 0.1,
-        replace: bool = True,
-    ) -> None:
-        """Add raw non-negative data."""
-        x = np.asarray(data, dtype=float)
-        if x.size == 0:
-            raise ValueError("Data of added variant needs to have some observations.")
-        if (x < 0).any():
-            raise ValueError("Input data needs to be a list of non-negative numbers.")
-        self.add_variant_data_agg(
-            name, int(x.size), float(x.sum()), a_prior, b_prior, replace
-        )
+        Parameters
+        ----------
+        name : variant name.
+        totals : number of observations.
+        sum_values : sum of the durations.
+        replace : replace an existing variant (True) or append to it (False).
+        """
+        self._store(name, {"totals": totals, "sum_values": sum_values}, replace)

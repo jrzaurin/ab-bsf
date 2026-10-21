@@ -1,12 +1,4 @@
-"""
-The code in this module is based on the code in the following repository:
-https://github.com/Matt52/bayesian-testing
-
-Therefore, all credits to the original author.
-"""
-
 import warnings
-from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -18,56 +10,83 @@ from ab_bsf.bayesian.metrics.evaluation import (
     estimate_relative_credible_intervals,
     estimate_relative_differences,
 )
+from ab_bsf.bayesian.models import ConjugateModel
+from ab_bsf.bayesian.models.base import Data
 
 
-class BaseBayesianTest(ABC):
+class BayesianTest:
     """
-    Base class for Bayesian A/B(/C...) tests.
+    Bayesian A/B(/C...) test: compares the variants of one ``ConjugateModel``.
 
-    Each variant is stored in ``self.data[name]`` as a dict of aggregated
-    sufficient statistics plus its prior parameters. When appending with
-    ``replace=False`` the aggregates are summed and the original priors are
-    kept. Subclasses implement ``_posterior_samples``, ``_posterior_means`` and
-    ``_observed_columns``.
+    Each variant is stored in ``self.data[name]`` as the sufficient statistics of
+    its data. All variants share the model's prior. When appending with
+    ``replace=False`` the statistics are summed.
 
     The first variant added is the reference for relative differences unless
     ``reference`` is passed to ``evaluate``.
+
+    Priors are uninformative unless set in the model or with ``fit_priors``. With
+    informative priors, ``prior_fraction`` in ``evaluate`` and the other result
+    methods sets their weight at analysis time: ``0.2`` makes the prior worth 20%
+    of the observations of the average variant, the same for every variant. With
+    the default weak priors it would inflate them.
+
+    Parameters
+    ----------
+    model : the conjugate model shared by all variants.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, model: ConjugateModel) -> None:
+        self.model = model
         self.data: Dict[str, Dict[str, Any]] = {}
 
     @property
     def variant_names(self) -> List[str]:
         return list(self.data)
 
+    def fit_priors(self, historical: Data) -> "BayesianTest":
+        """Set the model's prior from historical data. Returns ``self``."""
+        self.model.fit_priors(historical)
+        return self
+
+    def add_variant_data(self, name: str, data: Data, replace: bool = True) -> None:
+        """Add the raw data of a variant. ``replace=False`` appends to it."""
+        self._store(name, self.model.summarize(data), replace)
+
     def probabs_of_being_best(
         self,
         sim_count: int = 20000,
         seed: Optional[int] = None,
         min_is_best: bool = False,
+        prior_fraction: Optional[float] = None,
     ) -> Dict[str, float]:
         """Probability of each variant being best."""
-        return self._by_variant(estimate_probabilities, sim_count, seed, min_is_best)
+        return self._by_variant(
+            estimate_probabilities, sim_count, seed, prior_fraction, min_is_best
+        )
 
     def expected_loss(
         self,
         sim_count: int = 20000,
         seed: Optional[int] = None,
         min_is_best: bool = False,
+        prior_fraction: Optional[float] = None,
     ) -> Dict[str, float]:
         """Expected loss of choosing each variant."""
-        return self._by_variant(estimate_expected_loss, sim_count, seed, min_is_best)
+        return self._by_variant(
+            estimate_expected_loss, sim_count, seed, prior_fraction, min_is_best
+        )
 
     def credible_intervals(
         self,
         sim_count: int = 20000,
         seed: Optional[int] = None,
         interval_alpha: float = 0.95,
+        prior_fraction: Optional[float] = None,
     ) -> Dict[str, List[float]]:
         """Credible interval of each variant's metric."""
         return self._by_variant(
-            estimate_credible_intervals, sim_count, seed, interval_alpha
+            estimate_credible_intervals, sim_count, seed, prior_fraction, interval_alpha
         )
 
     def evaluate(
@@ -78,6 +97,7 @@ class BaseBayesianTest(ABC):
         interval_alpha: float = 0.95,
         reference: Optional[str] = None,
         return_samples: bool = True,
+        prior_fraction: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         """
         Evaluate the experiment.
@@ -90,6 +110,8 @@ class BaseBayesianTest(ABC):
         interval_alpha : probability of the credible intervals.
         reference : variant used for relative differences (default: first added).
         return_samples : include each variant's posterior draws under ``posterior_samples``.
+        prior_fraction : weight of the prior as a fraction of the observations of
+            the average variant (default: use the prior as it is).
 
         Returns
         -------
@@ -100,11 +122,16 @@ class BaseBayesianTest(ABC):
         if not self.data:
             return []
         ref = self._reference_idx(reference)
-        samples = self._posterior_samples(sim_count, seed)
+        model = self._weighted_model(prior_fraction)
+        samples = self._posterior_samples(model, sim_count, seed)
+        statistics = list(self.data.values())
 
+        observed = [self.model.observed(s) for s in statistics]
         columns: Dict[str, List[Any]] = {"variant": self.variant_names}
-        columns.update(self._observed_columns())
-        columns["posterior_mean"] = self._posterior_means()
+        columns.update({key: [row[key] for row in observed] for key in observed[0]})
+        columns["posterior_mean"] = [
+            round(model.posterior_mean(s), 5) for s in statistics
+        ]
         columns["credible_interval"] = estimate_credible_intervals(
             samples, interval_alpha
         )
@@ -131,38 +158,57 @@ class BaseBayesianTest(ABC):
         else:
             del self.data[name]
 
-    def _store(
-        self,
-        name: str,
-        aggregates: Dict[str, Any],
-        priors: Dict[str, Any],
-        replace: bool,
-    ) -> None:
+    def _store(self, name: str, statistics: Dict[str, Any], replace: bool) -> None:
         if not isinstance(name, str):
             raise ValueError("Variant name has to be a string.")
+        self.model.validate(statistics)
         if name not in self.data:
-            self.data[name] = {**aggregates, **priors}
+            self.data[name] = statistics
         elif replace:
             warnings.warn(
                 f"Variant {name} already exists - new data is replacing it. "
                 "If you wish to append instead, use replace=False."
             )
-            self.data[name] = {**aggregates, **priors}
+            self.data[name] = statistics
         else:
             warnings.warn(
-                f"Variant {name} already exists - new data is appended to variant, "
-                "keeping its original prior setup. If you wish to replace data instead, use replace=True."
+                f"Variant {name} already exists - new data is appended to variant. "
+                "If you wish to replace data instead, use replace=True."
             )
-            for key, value in aggregates.items():
-                self.data[name][key] += value
+            for key, value in statistics.items():
+                self.data[name][key] = self.data[name][key] + value
 
-    def _values(self, key: str) -> List[Any]:
-        return [self.data[k][key] for k in self.data]
+    def _weighted_model(self, prior_fraction: Optional[float]) -> ConjugateModel:
+        if prior_fraction is None:
+            return self.model
+        if prior_fraction <= 0:
+            raise ValueError("prior_fraction must be positive")
+        mean_n = float(
+            np.mean([self.model.n_observations(s) for s in self.data.values()])
+        )
+        return self.model.weighted(prior_fraction * mean_n)
 
-    def _by_variant(self, estimate, sim_count: int, seed: Optional[int], *args) -> dict:
+    def _posterior_samples(
+        self, model: ConjugateModel, sim_count: int, seed: Optional[int]
+    ) -> np.ndarray:
+        """Posterior draws of each variant's metric, shape (n_variants, sim_count)."""
+        rng = np.random.default_rng(seed)
+        return np.array(
+            [model.posterior_samples(s, sim_count, rng) for s in self.data.values()]
+        )
+
+    def _by_variant(
+        self,
+        estimate,
+        sim_count: int,
+        seed: Optional[int],
+        prior_fraction: Optional[float],
+        *args,
+    ) -> dict:
         if not self.data:
             return {}
-        samples = self._posterior_samples(sim_count, seed)
+        model = self._weighted_model(prior_fraction)
+        samples = self._posterior_samples(model, sim_count, seed)
         return dict(zip(self.variant_names, estimate(samples, *args)))
 
     def _reference_idx(self, reference: Optional[str]) -> int:
@@ -173,15 +219,3 @@ class BaseBayesianTest(ABC):
                 f"Reference variant '{reference}' is not in the experiment."
             )
         return self.variant_names.index(reference)
-
-    @abstractmethod
-    def _posterior_samples(self, sim_count: int, seed: Optional[int]) -> np.ndarray:
-        """Posterior draws of each variant's mean metric, shape (n_variants, sim_count)."""
-
-    @abstractmethod
-    def _observed_columns(self) -> Dict[str, List[Any]]:
-        """Observed (data) columns reported by ``evaluate``, in display order."""
-
-    @abstractmethod
-    def _posterior_means(self) -> List[float]:
-        """Posterior mean of the metric, in closed form from the conjugate update."""
